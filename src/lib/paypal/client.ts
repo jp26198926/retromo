@@ -1,4 +1,5 @@
 import { Client, Environment } from "@paypal/paypal-server-sdk";
+import { getAppSettings } from "@/lib/app-settings";
 
 /**
  * Shared PayPal server SDK client.
@@ -29,17 +30,21 @@ function createPayPalClient() {
 
 export const paypalClient = createPayPalClient();
 
-export const PAYPAL_PLANS = {
-  individual: {
-    name: "Individual Plan",
-    amount: "10.00",
-    description: "RetroMo Individual subscription — 1 month",
-  },
-  company: {
-    name: "Company Plan",
-    amount: "20.00",
-    description: "RetroMo Company subscription — 1 month",
-  },
-} as const;
+export type PlanKey = "individual" | "company";
 
-export type PlanKey = keyof typeof PAYPAL_PLANS;
+/**
+ * Get the current plan pricing from app settings (admin-configurable).
+ */
+export async function getPlanPricing() {
+  const settings = await getAppSettings();
+  return {
+    individual: { name: "Individual Plan", amount: settings.individualPrice },
+    company: { name: "Company Plan", amount: settings.companyPrice },
+  };
+}
+
+// Keep a synchronous fallback for places that need the default amounts
+export const PAYPAL_PLANS = {
+  individual: { name: "Individual Plan", amount: "10.00" },
+  company: { name: "Company Plan", amount: "20.00" },
+} as const;

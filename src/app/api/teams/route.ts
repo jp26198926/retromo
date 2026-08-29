@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { teams, teamMembers } from "@/db/schema";
 import { getSession } from "@/lib/session";
-import { eq } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
+import { getCurrentUserPlan, hasActiveAccess } from "@/lib/plans";
 
 // POST — create a team
 export async function POST(req: NextRequest) {
@@ -17,6 +18,34 @@ export async function POST(req: NextRequest) {
 
     if (!name || !name.trim()) {
       return NextResponse.json({ error: "Team name is required" }, { status: 400 });
+    }
+
+    // Enforce plan-based team limit.
+    // anonymous = 0 teams, individual = 3 teams, company = unlimited (-1)
+    const plan = await getCurrentUserPlan();
+    if (!hasActiveAccess(plan)) {
+      return NextResponse.json(
+        { error: "Your subscription has expired. Upgrade to a paid plan to manage teams." },
+        { status: 403 }
+      );
+    }
+    if (plan.maxTeams === 0) {
+      return NextResponse.json(
+        { error: "The Anonymous plan does not include team management. Upgrade to Individual or Company to create teams." },
+        { status: 403 }
+      );
+    }
+    if (plan.maxTeams > 0) {
+      const [{ value: teamCount }] = await db
+        .select({ value: count() })
+        .from(teamMembers)
+        .where(eq(teamMembers.userId, session.user.id));
+      if (teamCount >= plan.maxTeams) {
+        return NextResponse.json(
+          { error: `Your plan allows up to ${plan.maxTeams} team${plan.maxTeams === 1 ? "" : "s"}. Upgrade to create more.` },
+          { status: 403 }
+        );
+      }
     }
 
     const teamId = crypto.randomUUID();

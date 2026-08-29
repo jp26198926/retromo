@@ -6,6 +6,7 @@ import Link from "next/link";
 import { signUp, signIn } from "@/lib/auth-client";
 import { Button } from "@/components/Button";
 import { Logo } from "@/components/Logo";
+import { useSocialProviders } from "@/components/useSocialProviders";
 
 export default function SignUpPage() {
   return (
@@ -20,6 +21,7 @@ function SignUpForm() {
   const params = useSearchParams();
   const plan = params.get("plan");
   const callbackURL = plan ? `/dashboard?plan=${plan}` : "/dashboard";
+  const { providers } = useSocialProviders();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -104,19 +106,25 @@ function SignUpForm() {
             </Button>
           </form>
 
-          <div className="my-4 flex items-center gap-3">
-            <div className="h-px flex-1 bg-neutral-200" />
-            <span className="text-xs text-neutral-400">or</span>
-            <div className="h-px flex-1 bg-neutral-200" />
-          </div>
+          {(providers.google || providers.github) && (
+            <div className="my-4 flex items-center gap-3">
+              <div className="h-px flex-1 bg-neutral-200" />
+              <span className="text-xs text-neutral-400">or</span>
+              <div className="h-px flex-1 bg-neutral-200" />
+            </div>
+          )}
 
           <div className="space-y-2">
-            <Button variant="outline" className="w-full" onClick={handleGoogle} disabled={loading}>
-              <span>Continue with Google</span>
-            </Button>
-            <Button variant="outline" className="w-full" onClick={handleGithub} disabled={loading}>
-              <span>Continue with GitHub</span>
-            </Button>
+            {providers.google && (
+              <Button variant="outline" className="w-full" onClick={handleGoogle} disabled={loading}>
+                <span>Continue with Google</span>
+              </Button>
+            )}
+            {providers.github && (
+              <Button variant="outline" className="w-full" onClick={handleGithub} disabled={loading}>
+                <span>Continue with GitHub</span>
+              </Button>
+            )}
           </div>
 
           <p className="mt-6 text-center text-sm text-neutral-500">

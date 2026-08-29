@@ -18,11 +18,14 @@ export const user = pgTable("user", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   isAnonymous: boolean("is_anonymous").notNull().default(false),
+  // role: "user" | "admin" — admin is also defined by ADMIN_EMAIL env var
+  role: text("role").notNull().default("user"),
   // subscription / billing fields
   subscriptionPlan: planEnum("subscription_plan").notNull().default("anonymous"),
   subscriptionStatus: text("subscription_status").notNull().default("none"), // none | active | cancelled | past_due
   paypalSubscriptionId: text("paypal_subscription_id"),
   subscriptionCurrentPeriodEnd: timestamp("subscription_current_period_end"),
+  subscriptionCancelledAt: timestamp("subscription_cancelled_at"),
 });
 
 export const session = pgTable("session", {
@@ -149,6 +152,9 @@ export const cards = pgTable("card", {
   retroId: uuid("retro_id").notNull().references(() => retros.id, { onDelete: "cascade" }),
   authorId: text("author_id"), // can be null for fully anonymous
   authorName: text("author_name"),
+  // For anonymous users we store the participant id so we can verify ownership
+  // (the participant is deduped by anonymousSessionId per browser session)
+  authorParticipantId: uuid("author_participant_id"),
   content: text("content").notNull(),
   imageUrl: text("image_url"),
   color: cardColorEnum("color").notNull().default("yellow"),
@@ -191,6 +197,42 @@ export const templates = pgTable("template", {
   emoji: text("emoji").notNull(),
   columns: jsonb("columns").$type<{ name: string; description?: string; color: string }[]>().notNull(),
   isBuiltIn: boolean("is_built_in").notNull().default(true),
+});
+
+// -----------------------------
+// Billing history
+// -----------------------------
+export const billingHistory = pgTable("billing_history", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  paypalOrderId: text("paypal_order_id"),
+  plan: planEnum("plan").notNull(),
+  amount: text("amount").notNull(), // store as string to preserve decimals
+  currency: text("currency").notNull().default("USD"),
+  status: text("status").notNull().default("completed"), // completed | refunded | failed | pending
+  // type of transaction: subscribe | change_plan | renewal
+  type: text("type").notNull().default("subscribe"),
+  // if changing plans, store the previous plan
+  previousPlan: planEnum("previous_plan"),
+  description: text("description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// -----------------------------
+// App settings (managed by admin)
+// -----------------------------
+export const appSettings = pgTable("app_settings", {
+  id: text("id").primaryKey().default("singleton"),
+  appName: text("app_name").notNull().default("RetroMo"),
+  appDescription: text("app_description").notNull().default("Your online retrospective made easy"),
+  // URLs to uploaded assets (stored under /public/uploads)
+  appIconUrl: text("app_icon_url"),
+  faviconUrl: text("favicon_url"),
+  // plan pricing (admin can adjust)
+  individualPrice: text("individual_price").notNull().default("10.00"),
+  companyPrice: text("company_price").notNull().default("20.00"),
+  anonymousParticipantLimit: integer("anonymous_participant_limit").notNull().default(50),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // -----------------------------
@@ -246,6 +288,10 @@ export const retroParticipantRelations = relations(retroParticipants, ({ one }) 
   user: one(user, { fields: [retroParticipants.userId], references: [user.id] }),
 }));
 
+export const billingHistoryRelations = relations(billingHistory, ({ one }) => ({
+  user: one(user, { fields: [billingHistory.userId], references: [user.id] }),
+}));
+
 export type Team = typeof teams.$inferSelect;
 export type Retro = typeof retros.$inferSelect;
 export type Column = typeof columns.$inferSelect;
@@ -254,3 +300,5 @@ export type Vote = typeof votes.$inferSelect;
 export type ActionPoint = typeof actionPoints.$inferSelect;
 export type RetroParticipant = typeof retroParticipants.$inferSelect;
 export type Template = typeof templates.$inferSelect;
+export type BillingHistory = typeof billingHistory.$inferSelect;
+export type AppSettings = typeof appSettings.$inferSelect;

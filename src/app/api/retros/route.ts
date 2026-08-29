@@ -4,6 +4,7 @@ import { retros, columns, retroParticipants } from "@/db/schema";
 import { getSession } from "@/lib/session";
 import { generateShareToken, randomColor, randomDisplayName } from "@/lib/utils";
 import { eq } from "drizzle-orm";
+import { getCurrentUserPlan, hasActiveAccess } from "@/lib/plans";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,6 +15,7 @@ export async function POST(req: NextRequest) {
       title,
       topic,
       engagement = "anonymous",
+      visibility = "regular",
       columns: cols = [],
       votesPerParticipant = 3,
       votesPerColumn = 3,
@@ -21,7 +23,6 @@ export async function POST(req: NextRequest) {
       secretVoting = true,
       timerDuration = 0,
       teamId = null,
-      plan = "anonymous",
     } = body;
 
     if (!title || !title.trim()) {
@@ -29,6 +30,41 @@ export async function POST(req: NextRequest) {
     }
     if (!cols.length) {
       return NextResponse.json({ error: "At least one column is required" }, { status: 400 });
+    }
+
+    // Determine the effective plan for this retro based on the creator's subscription.
+    // Anonymous (not-logged-in) users and free users get the "anonymous" plan retro.
+    // Paid users with active access get their plan's features.
+    let retroPlan: "anonymous" | "individual" | "company" = "anonymous";
+    let privateRetrosAllowed = false;
+    let advancedFacilitation = false;
+
+    if (session?.user) {
+      const plan = await getCurrentUserPlan();
+      if (hasActiveAccess(plan)) {
+        retroPlan = plan.plan;
+        privateRetrosAllowed = plan.privateRetros;
+        advancedFacilitation = plan.advancedFacilitation;
+      }
+    }
+
+    // Enforce private retros — only Individual/Company plans can create private retros
+    const resolvedVisibility: "regular" | "private" =
+      visibility === "private" ? "private" : "regular";
+    if (resolvedVisibility === "private" && !privateRetrosAllowed) {
+      return NextResponse.json(
+        { error: "Private retrospectives are available on the Individual and Company plans. Upgrade to create a private retro." },
+        { status: 403 }
+      );
+    }
+
+    // Enforce advanced facilitation: moderation is a paid feature
+    const moderated = body.moderated === true;
+    if (moderated && !advancedFacilitation) {
+      return NextResponse.json(
+        { error: "Moderation is an advanced facilitation feature available on paid plans." },
+        { status: 403 }
+      );
     }
 
     const retroId = crypto.randomUUID();
@@ -41,16 +77,18 @@ export async function POST(req: NextRequest) {
         title: title.trim(),
         topic: topic?.trim() || null,
         engagement,
+        visibility: resolvedVisibility,
         votesPerParticipant,
         votesPerColumn,
         votesPerCard,
         secretVoting,
+        moderated,
         timerDuration,
         teamId: teamId || null,
         ownerId: session?.user.id || null,
-        plan,
+        plan: retroPlan,
         shareToken: generateShareToken(),
-        retentionDays: plan === "anonymous" ? 365 : null,
+        retentionDays: retroPlan === "anonymous" ? 365 : null,
         timerEndsAt: timerDuration > 0 ? new Date(now.getTime() + timerDuration * 1000) : null,
       })
       .returning();

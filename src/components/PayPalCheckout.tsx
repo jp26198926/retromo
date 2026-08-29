@@ -10,10 +10,11 @@ import { useSession } from "@/lib/auth-client";
 interface PayPalCheckoutProps {
   plan: "individual" | "company";
   amount: string;
+  type?: "subscribe" | "change_plan";
   onSuccess?: (plan: string) => void;
 }
 
-export function PayPalCheckout({ plan, amount, onSuccess }: PayPalCheckoutProps) {
+export function PayPalCheckout({ plan, amount, type = "subscribe", onSuccess }: PayPalCheckoutProps) {
   const { data: sessionData } = useSession();
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -76,7 +77,7 @@ export function PayPalCheckout({ plan, amount, onSuccess }: PayPalCheckoutProps)
             const res = await fetch("/api/paypal/create-order", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ plan }),
+              body: JSON.stringify({ plan, type }),
             });
             if (!res.ok) {
               const data = await res.json().catch(() => ({}));
@@ -112,7 +113,7 @@ export function PayPalCheckout({ plan, amount, onSuccess }: PayPalCheckoutProps)
         />
       </PayPalProvider>
       <p className="mt-2 text-center text-xs text-neutral-400">
-        You will be charged ${amount} for 1 month of the {plan} plan.
+        You will be charged ${amount} for 1 month of the {plan} plan. Recurring — cancel anytime.
       </p>
     </div>
   );

@@ -2,21 +2,31 @@ import {
   OrdersController,
   CheckoutPaymentIntent,
 } from "@paypal/paypal-server-sdk";
-import { paypalClient, PAYPAL_PLANS, type PlanKey } from "./client";
+import { paypalClient } from "./client";
+import { getAppSettings } from "@/lib/app-settings";
+
+export type PurchaseType = "subscribe" | "change_plan";
 
 /**
  * Create a PayPal order for a subscription plan payment.
  * Returns the PayPal order ID.
+ * Pricing is read from the app settings (admin-configurable).
  */
-export async function createPayPalOrder(plan: PlanKey): Promise<string> {
+export async function createPayPalOrder(
+  plan: "individual" | "company",
+  type: PurchaseType = "subscribe"
+): Promise<string> {
   if (!paypalClient) {
     throw new Error("PayPal is not configured. Set NEXT_PUBLIC_PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET.");
   }
 
-  const planConfig = PAYPAL_PLANS[plan];
-  if (!planConfig) {
-    throw new Error(`Unknown plan: ${plan}`);
-  }
+  const settings = await getAppSettings();
+  const amount = plan === "individual" ? settings.individualPrice : settings.companyPrice;
+  const planName = plan === "individual" ? "Individual Plan" : "Company Plan";
+  const description =
+    type === "change_plan"
+      ? `RetroMo plan change to ${planName} — 1 month (recurring)`
+      : `RetroMo ${planName} subscription — 1 month (recurring)`;
 
   const ordersController = new OrdersController(paypalClient);
 
@@ -27,9 +37,9 @@ export async function createPayPalOrder(plan: PlanKey): Promise<string> {
         {
           amount: {
             currencyCode: "USD",
-            value: planConfig.amount,
+            value: amount,
           },
-          description: planConfig.description,
+          description,
         },
       ],
     },
@@ -45,12 +55,14 @@ export async function createPayPalOrder(plan: PlanKey): Promise<string> {
 
 /**
  * Capture (finalize) an approved PayPal order.
- * Returns the full capture result.
+ * Returns the capture result including the amount paid so the caller
+ * can determine which plan was purchased.
  */
 export async function capturePayPalOrder(orderId: string): Promise<{
   id: string;
   status: string;
-  plan: PlanKey | null;
+  amount: string | null;
+  plan: "individual" | "company" | null;
 }> {
   if (!paypalClient) {
     throw new Error("PayPal is not configured. Set NEXT_PUBLIC_PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET.");
@@ -63,15 +75,20 @@ export async function capturePayPalOrder(orderId: string): Promise<{
     prefer: "return=representation",
   });
 
-  // Extract the amount to determine which plan was purchased
-  const amount = result.purchaseUnits?.[0]?.payments?.captures?.[0]?.amount?.value;
-  let plan: PlanKey | null = null;
-  if (amount === PAYPAL_PLANS.individual.amount) plan = "individual";
-  else if (amount === PAYPAL_PLANS.company.amount) plan = "company";
+  const amount = result.purchaseUnits?.[0]?.payments?.captures?.[0]?.amount?.value || null;
+
+  // Determine plan from amount using current app settings pricing
+  let plan: "individual" | "company" | null = null;
+  if (amount) {
+    const settings = await getAppSettings();
+    if (amount === settings.individualPrice) plan = "individual";
+    else if (amount === settings.companyPrice) plan = "company";
+  }
 
   return {
     id: result.id || orderId,
     status: result.status || "UNKNOWN",
+    amount,
     plan,
   };
 }

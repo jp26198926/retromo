@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { retroParticipants } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { retroParticipants, retros } from "@/db/schema";
+import { eq, and, count } from "drizzle-orm";
 import { getSession } from "@/lib/session";
 import { randomColor, randomDisplayName } from "@/lib/utils";
+import { getAppSettings } from "@/lib/app-settings";
 
 // Join a retro as a participant (creates or returns existing)
 export async function POST(req: NextRequest) {
@@ -14,6 +15,10 @@ export async function POST(req: NextRequest) {
 
     if (!retroId) return NextResponse.json({ error: "retroId required" }, { status: 400 });
 
+    // Look up the retro to check its plan
+    const retro = await db.query.retros.findFirst({ where: eq(retros.id, retroId) });
+    if (!retro) return NextResponse.json({ error: "Retro not found" }, { status: 404 });
+
     // If logged in, find existing by userId
     if (session?.user) {
       const mine = await db.query.retroParticipants.findMany({
@@ -21,6 +26,21 @@ export async function POST(req: NextRequest) {
       });
       const found = mine.find((p) => p.userId === session.user.id);
       if (found) return NextResponse.json(found);
+
+      // Check participant limit for anonymous-plan retros
+      if (retro.plan === "anonymous") {
+        const settings = await getAppSettings();
+        const [{ value: participantCount }] = await db
+          .select({ value: count() })
+          .from(retroParticipants)
+          .where(eq(retroParticipants.retroId, retroId));
+        if (participantCount >= settings.anonymousParticipantLimit) {
+          return NextResponse.json(
+            { error: `This retro has reached the ${settings.anonymousParticipantLimit}-participant limit. Upgrade to a paid plan for unlimited participants.` },
+            { status: 403 }
+          );
+        }
+      }
 
       const [p] = await db
         .insert(retroParticipants)
@@ -46,6 +66,21 @@ export async function POST(req: NextRequest) {
         ),
       });
       if (existing) return NextResponse.json(existing);
+    }
+
+    // Check participant limit for anonymous-plan retros
+    if (retro.plan === "anonymous") {
+      const settings = await getAppSettings();
+      const [{ value: participantCount }] = await db
+        .select({ value: count() })
+        .from(retroParticipants)
+        .where(eq(retroParticipants.retroId, retroId));
+      if (participantCount >= settings.anonymousParticipantLimit) {
+        return NextResponse.json(
+          { error: `This retro has reached the ${settings.anonymousParticipantLimit}-participant limit. The retro owner can upgrade to a paid plan for unlimited participants.` },
+          { status: 403 }
+        );
+      }
     }
 
     // Create new anonymous participant

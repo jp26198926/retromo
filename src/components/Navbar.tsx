@@ -4,19 +4,25 @@ import Link from "next/link";
 import { useSession, signOut } from "@/lib/auth-client";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/Button";
+import { useAdmin } from "@/components/useAdmin";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-const links = [
+// Public navlinks shown to logged-out visitors.
+// FAQ is always shown (per requirement). Features/Plans/Teams are hidden when logged in.
+const publicLinks = [
   { href: "/features", label: "Features" },
   { href: "/plans", label: "Plans" },
-  { href: "/faq", label: "FAQ" },
   { href: "/teams", label: "Teams" },
 ];
+const faqLink = { href: "/faq", label: "FAQ" };
 
 export function Navbar() {
   const { data: session, isPending } = useSession();
+  const { isAdmin } = useAdmin();
   const [open, setOpen] = useState(false);
+
+  const loggedIn = !isPending && !!session;
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-neutral-200 bg-white/80 backdrop-blur">
@@ -24,20 +30,38 @@ export function Navbar() {
         <div className="flex items-center gap-8">
           <Logo />
           <nav className="hidden items-center gap-1 md:flex">
-            {links.map((l) => (
+            {/* Public links (Features, Plans, Teams) only shown when logged out */}
+            {!loggedIn &&
+              publicLinks.map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className="rounded-md px-3 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                >
+                  {l.label}
+                </Link>
+              ))}
+            {/* FAQ is always visible */}
+            <Link
+              href={faqLink.href}
+              className="rounded-md px-3 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+            >
+              {faqLink.label}
+            </Link>
+            {/* Admin link only for admins */}
+            {loggedIn && isAdmin && (
               <Link
-                key={l.href}
-                href={l.href}
-                className="rounded-md px-3 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                href="/admin"
+                className="rounded-md px-3 py-2 text-sm font-semibold text-indigo-600 hover:bg-indigo-50"
               >
-                {l.label}
+                Admin
               </Link>
-            ))}
+            )}
           </nav>
         </div>
 
         <div className="hidden items-center gap-2 md:flex">
-          {!isPending && session ? (
+          {loggedIn ? (
             <>
               <Link href="/dashboard">
                 <Button variant="ghost" size="md">
@@ -69,7 +93,7 @@ export function Navbar() {
               <Link href="/sign-in">
                 <Button variant="ghost" size="md">
                   Sign in
-              </Button>
+                </Button>
               </Link>
               <Link href="/new-retrospective">
                 <Button size="md">Create free retro</Button>
@@ -104,18 +128,38 @@ export function Navbar() {
       {/* Mobile menu */}
       <div className={cn("border-t border-neutral-200 md:hidden", open ? "block" : "hidden")}>
         <div className="space-y-1 px-4 py-3">
-          {links.map((l) => (
+          {/* Public links only when logged out */}
+          {!loggedIn &&
+            publicLinks.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                onClick={() => setOpen(false)}
+                className="block rounded-md px-3 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-100"
+              >
+                {l.label}
+              </Link>
+            ))}
+          {/* FAQ always */}
+          <Link
+            href={faqLink.href}
+            onClick={() => setOpen(false)}
+            className="block rounded-md px-3 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-100"
+          >
+            {faqLink.label}
+          </Link>
+          {/* Admin for admins */}
+          {loggedIn && isAdmin && (
             <Link
-              key={l.href}
-              href={l.href}
+              href="/admin"
               onClick={() => setOpen(false)}
-              className="block rounded-md px-3 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-100"
+              className="block rounded-md px-3 py-2 text-base font-semibold text-indigo-600 hover:bg-indigo-50"
             >
-              {l.label}
+              Admin
             </Link>
-          ))}
+          )}
           <div className="border-t border-neutral-200 pt-3">
-            {!isPending && session ? (
+            {loggedIn ? (
               <>
                 <Link href="/dashboard" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-100">
                   Dashboard

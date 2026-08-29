@@ -6,6 +6,7 @@ import Link from "next/link";
 import { signIn } from "@/lib/auth-client";
 import { Button } from "@/components/Button";
 import { Logo } from "@/components/Logo";
+import { useSocialProviders } from "@/components/useSocialProviders";
 
 export default function SignInPage() {
   return (
@@ -20,6 +21,7 @@ function SignInForm() {
   const params = useSearchParams();
   const callbackURL = params.get("callbackURL") || "/dashboard";
   const plan = params.get("plan");
+  const { providers } = useSocialProviders();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -51,6 +53,8 @@ function SignInForm() {
     setLoading(true);
     await (signIn as any).social?.({ provider: "github", callbackURL });
   }
+
+  const hasSocial = providers.google || providers.github;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-50 px-4 py-12">
@@ -90,20 +94,28 @@ function SignInForm() {
             </Button>
           </form>
 
-          <div className="my-4 flex items-center gap-3">
-            <div className="h-px flex-1 bg-neutral-200" />
-            <span className="text-xs text-neutral-400">or</span>
-            <div className="h-px flex-1 bg-neutral-200" />
-          </div>
+          {hasSocial && (
+            <>
+              <div className="my-4 flex items-center gap-3">
+                <div className="h-px flex-1 bg-neutral-200" />
+                <span className="text-xs text-neutral-400">or</span>
+                <div className="h-px flex-1 bg-neutral-200" />
+              </div>
 
-          <div className="space-y-2">
-            <Button variant="outline" className="w-full" onClick={handleGoogle} disabled={loading}>
-              <span>Continue with Google</span>
-            </Button>
-            <Button variant="outline" className="w-full" onClick={handleGithub} disabled={loading}>
-              <span>Continue with GitHub</span>
-            </Button>
-          </div>
+              <div className="space-y-2">
+                {providers.google && (
+                  <Button variant="outline" className="w-full" onClick={handleGoogle} disabled={loading}>
+                    <span>Continue with Google</span>
+                  </Button>
+                )}
+                {providers.github && (
+                  <Button variant="outline" className="w-full" onClick={handleGithub} disabled={loading}>
+                    <span>Continue with GitHub</span>
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
 
           <p className="mt-6 text-center text-sm text-neutral-500">
             No account?{" "}

@@ -60,35 +60,39 @@ export default function RetroBoardPage() {
   }
 
   async function deleteCard(cardId: string) {
-    await fetch(`/api/cards?id=${cardId}`, { method: "DELETE" });
+    const pid = state?.currentParticipant?.id || null;
+    await fetch(`/api/cards?id=${cardId}${pid ? `&pid=${pid}` : ""}`, { method: "DELETE" });
     refresh();
   }
 
   async function togglePublic(cardId: string) {
     const card = state?.cards.find((c) => c.id === cardId);
     if (!card) return;
+    const pid = state?.currentParticipant?.id || null;
     await fetch("/api/cards", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: cardId, isPublic: !card.isPublic }),
+      body: JSON.stringify({ id: cardId, isPublic: !card.isPublic, anonymousParticipantId: pid }),
     });
     refresh();
   }
 
   async function colorChange(cardId: string, color: string) {
+    const pid = state?.currentParticipant?.id || null;
     await fetch("/api/cards", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: cardId, color }),
+      body: JSON.stringify({ id: cardId, color, anonymousParticipantId: pid }),
     });
     refresh();
   }
 
   async function dropCard(cardId: string, columnId: string, isPublic: boolean) {
+    const pid = state?.currentParticipant?.id || null;
     await fetch("/api/cards", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: cardId, columnId, isPublic }),
+      body: JSON.stringify({ id: cardId, columnId, isPublic, anonymousParticipantId: pid }),
     });
     refresh();
   }

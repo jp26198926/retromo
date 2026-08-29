@@ -1,65 +1,71 @@
+"use client";
+
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { PlanCard } from "@/components/PlanCard";
-
-export const metadata = { title: "Plans | RetroMo" };
-
-const plans = [
-  {
-    name: "Anonymous",
-    tagline: "Quick, throw-away retros",
-    price: "Free",
-    period: "forever",
-    features: [
-      "Quick and easy to start",
-      "Stored for up to 12 months",
-      "Unlimited cards, columns and action points",
-      "Unlimited participants",
-      "Basic facilitation tools",
-      "Data export to Markdown",
-    ],
-    planKey: "anonymous" as const,
-    amount: "0",
-    highlight: false,
-  },
-  {
-    name: "Individual",
-    tagline: "For team-focused professionals",
-    price: "$10",
-    period: "per month",
-    features: [
-      "Everything from Anonymous, and:",
-      "Advanced facilitation tools",
-      "Extended retro customization",
-      "Manage up to 3 teams",
-      "Infinite retrospective archive",
-      "Configurable data retention times",
-      "Private, invite-only retrospectives",
-      "High priority support",
-    ],
-    planKey: "individual" as const,
-    amount: "10.00",
-    highlight: true,
-  },
-  {
-    name: "Company",
-    tagline: "For companies of all sizes",
-    price: "$20",
-    period: "per month",
-    features: [
-      "Everything from Individual, and:",
-      "Manage unlimited teams in your company",
-      "Assign any number of teams to Scrum Masters and Team Leads",
-      "Zero-knowledge encryption with custom passwords",
-      "Top priority support",
-    ],
-    planKey: "company" as const,
-    amount: "20.00",
-    highlight: false,
-  },
-];
+import { useAppSettings } from "@/components/useAppSettings";
 
 export default function PlansPage() {
+  const { settings, loaded } = useAppSettings();
+
+  const individualPrice = `$${settings.individualPrice}`;
+  const companyPrice = `$${settings.companyPrice}`;
+
+  const plans = [
+    {
+      name: "Anonymous",
+      tagline: "Quick, throw-away retros",
+      price: "Free",
+      period: "forever",
+      features: [
+        "Quick and easy to start",
+        "Stored for up to 12 months",
+        "Unlimited cards, columns and action points",
+        `Up to ${settings.anonymousParticipantLimit} participants per retro`,
+        "Basic facilitation tools",
+        "Data export to Markdown",
+      ],
+      planKey: "anonymous" as const,
+      amount: "0",
+      highlight: false,
+    },
+    {
+      name: "Individual",
+      tagline: "For team-focused professionals",
+      price: loaded ? individualPrice : "$10",
+      period: "per month",
+      features: [
+        "Everything from Anonymous, and:",
+        "Advanced facilitation tools",
+        "Extended retro customization",
+        "Manage up to 3 teams",
+        "Infinite retrospective archive",
+        "Configurable data retention times",
+        "Private, invite-only retrospectives",
+        "High priority support",
+      ],
+      planKey: "individual" as const,
+      amount: settings.individualPrice,
+      highlight: true,
+    },
+    {
+      name: "Company",
+      tagline: "For companies of all sizes",
+      price: loaded ? companyPrice : "$20",
+      period: "per month",
+      features: [
+        "Everything from Individual, and:",
+        "Manage unlimited teams in your company",
+        "Assign any number of teams to Scrum Masters and Team Leads",
+        "Zero-knowledge encryption with custom passwords",
+        "Top priority support",
+      ],
+      planKey: "company" as const,
+      amount: settings.companyPrice,
+      highlight: false,
+    },
+  ];
+
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
@@ -77,7 +83,7 @@ export default function PlansPage() {
               <PlanCard key={p.name} {...p} />
             ))}
           </div>
-          <p className="mt-6 text-center text-sm text-neutral-500">Pay securely with PayPal. Cancel anytime.</p>
+          <p className="mt-6 text-center text-sm text-neutral-500">Pay securely with PayPal. Recurring monthly — cancel anytime.</p>
         </section>
 
         <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6">

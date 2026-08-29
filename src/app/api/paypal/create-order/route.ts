@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPayPalOrder } from "@/lib/paypal/orders";
-import { PAYPAL_PLANS, type PlanKey } from "@/lib/paypal/client";
+import { getAppSettings } from "@/lib/app-settings";
 import { getSession } from "@/lib/session";
 
-// Create a PayPal order for a subscription plan
+// Create a PayPal order for a subscription plan payment
+// Body: { plan: "individual" | "company", type?: "subscribe" | "change_plan" }
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
@@ -12,13 +13,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { plan } = body as { plan: string };
+    const { plan, type = "subscribe" } = body as { plan: string; type?: string };
 
-    if (!plan || !(plan in PAYPAL_PLANS)) {
+    if (plan !== "individual" && plan !== "company") {
       return NextResponse.json({ error: "Invalid plan. Choose 'individual' or 'company'." }, { status: 400 });
     }
 
-    const orderId = await createPayPalOrder(plan as PlanKey);
+    const orderId = await createPayPalOrder(plan as "individual" | "company", type as "subscribe" | "change_plan");
     return NextResponse.json({ id: orderId });
   } catch (e) {
     console.error("[POST /api/paypal/create-order]", e);
