@@ -3,12 +3,11 @@ import { db } from "@/db";
 import { appSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getAdminSession } from "@/lib/admin";
-import { writeFile, mkdir } from "fs/promises";
-import { existsSync } from "fs";
-import path from "path";
+import { uploadBuffer } from "@/lib/cloudinary";
 
-// POST — upload an app icon or favicon (admin only)
+// POST — upload an app icon or favicon to Cloudinary (admin only)
 // Accepts multipart/form-data with a "file" field and a "type" field ("icon" | "favicon")
+// Returns { url } containing the Cloudinary secure_url for the uploaded image.
 export async function POST(req: NextRequest) {
   try {
     const admin = await getAdminSession();
@@ -37,22 +36,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "File too large (max 2 MB)" }, { status: 400 });
     }
 
-    // Ensure uploads directory exists
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true });
-    }
-
-    // Generate a unique filename
-    const ext = file.name.split(".").pop() || "png";
-    const filename = `${type}-${Date.now()}.${ext}`;
-    const filepath = path.join(uploadsDir, filename);
+    // Convert the uploaded file to a Buffer
     const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(filepath, buffer);
 
-    const url = `/uploads/${filename}`;
+    // Upload to Cloudinary
+    const result = await uploadBuffer(buffer, {
+      folder: "retromo/admin",
+      public_id: `${type}-${Date.now()}`,
+      resource_type: "image",
+      tags: ["retromo", type],
+    });
 
-    // Save the URL into app settings
+    const url = result.secure_url;
+
+    // Save the Cloudinary URL into app settings
     const field = type === "icon" ? "appIconUrl" : "faviconUrl";
     const existing = await db.query.appSettings.findFirst({ where: eq(appSettings.id, "singleton") });
     if (!existing) {
@@ -64,6 +61,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url });
   } catch (e) {
     console.error("[POST /api/admin/upload]", e);
-    return NextResponse.json({ error: "Failed to upload file" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to upload file to Cloudinary" }, { status: 500 });
   }
 }
