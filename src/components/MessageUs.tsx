@@ -54,7 +54,10 @@ export function MessageUs() {
 
       <div className="space-y-4">
         <div>
-          <label htmlFor="contact-name" className="mb-1.5 block text-sm font-medium text-indigo-100">
+          <label
+            htmlFor="contact-name"
+            className="mb-1.5 block text-sm font-medium text-indigo-100"
+          >
             Your name
           </label>
           <input
@@ -69,7 +72,10 @@ export function MessageUs() {
         </div>
 
         <div>
-          <label htmlFor="contact-email" className="mb-1.5 block text-sm font-medium text-indigo-100">
+          <label
+            htmlFor="contact-email"
+            className="mb-1.5 block text-sm font-medium text-indigo-100"
+          >
             Your email
           </label>
           <input
@@ -84,7 +90,10 @@ export function MessageUs() {
         </div>
 
         <div>
-          <label htmlFor="contact-message" className="mb-1.5 block text-sm font-medium text-indigo-100">
+          <label
+            htmlFor="contact-message"
+            className="mb-1.5 block text-sm font-medium text-indigo-100"
+          >
             Message
           </label>
           <textarea
@@ -103,7 +112,7 @@ export function MessageUs() {
             type="submit"
             size="lg"
             disabled={loading}
-            className="w-full bg-white text-indigo-700 hover:bg-indigo-50 sm:w-auto"
+            className="w-full bg-white-outline text-indigo-700 hover:bg-indigo-50 sm:w-auto"
           >
             {loading ? "Sending…" : "Send message"}
           </Button>
