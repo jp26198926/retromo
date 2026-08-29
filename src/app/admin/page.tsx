@@ -141,24 +141,29 @@ function OverviewTab() {
 
   useEffect(() => {
     fetch("/api/admin/reports")
-      .then((r) => r.json())
-      .then((d) => setReports(d))
+      .then(async (r) => {
+        const d = await r.json();
+        // Only set reports if the response has the expected shape
+        if (d && d.users && d.revenue && d.content) {
+          setReports(d);
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <p className="text-neutral-500">Loading reports…</p>;
-  if (!reports) return <p className="text-red-600">Failed to load reports.</p>;
+  if (!reports) return <p className="text-red-600">Failed to load reports. Please try again later.</p>;
 
   const statCards = [
-    { label: "Total Users", value: reports.users.total, color: "bg-indigo-50 text-indigo-700" },
-    { label: "Active Subscriptions", value: reports.users.activeSubs, color: "bg-green-50 text-green-700" },
-    { label: "Cancelled Subscriptions", value: reports.users.cancelledSubs, color: "bg-amber-50 text-amber-700" },
-    { label: "Total Retros", value: reports.content.totalRetros, color: "bg-violet-50 text-violet-700" },
-    { label: "Active Retros", value: reports.content.activeRetros, color: "bg-blue-50 text-blue-700" },
-    { label: "Total Teams", value: reports.content.totalTeams, color: "bg-pink-50 text-pink-700" },
-    { label: "Total Cards", value: reports.content.totalCards, color: "bg-teal-50 text-teal-700" },
-    { label: "Action Points", value: reports.content.totalActionPoints, color: "bg-orange-50 text-orange-700" },
+    { label: "Total Users", value: reports.users?.total ?? 0, color: "bg-indigo-50 text-indigo-700" },
+    { label: "Active Subscriptions", value: reports.users?.activeSubs ?? 0, color: "bg-green-50 text-green-700" },
+    { label: "Cancelled Subscriptions", value: reports.users?.cancelledSubs ?? 0, color: "bg-amber-50 text-amber-700" },
+    { label: "Total Retros", value: reports.content?.totalRetros ?? 0, color: "bg-violet-50 text-violet-700" },
+    { label: "Active Retros", value: reports.content?.activeRetros ?? 0, color: "bg-blue-50 text-blue-700" },
+    { label: "Total Teams", value: reports.content?.totalTeams ?? 0, color: "bg-pink-50 text-pink-700" },
+    { label: "Total Cards", value: reports.content?.totalCards ?? 0, color: "bg-teal-50 text-teal-700" },
+    { label: "Action Points", value: reports.content?.totalActionPoints ?? 0, color: "bg-orange-50 text-orange-700" },
   ];
 
   return (
@@ -168,18 +173,18 @@ function OverviewTab() {
         <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
           <p className="text-sm font-medium text-neutral-500">Total Revenue</p>
           <p className="mt-2 text-3xl font-bold text-neutral-900">
-            {reports.revenue.total === "0.00" ? "$0.00" : `$${reports.revenue.total}`}
+            {reports.revenue?.total === "0.00" ? "$0.00" : `$${reports.revenue?.total || "0.00"}`}
           </p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
           <p className="text-sm font-medium text-neutral-500">Revenue This Month</p>
           <p className="mt-2 text-3xl font-bold text-neutral-900">
-            {reports.revenue.thisMonth === "0.00" ? "$0.00" : `$${reports.revenue.thisMonth}`}
+            {reports.revenue?.thisMonth === "0.00" ? "$0.00" : `$${reports.revenue?.thisMonth || "0.00"}`}
           </p>
         </div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
           <p className="text-sm font-medium text-neutral-500">Total Transactions</p>
-          <p className="mt-2 text-3xl font-bold text-neutral-900">{reports.revenue.totalTransactions}</p>
+          <p className="mt-2 text-3xl font-bold text-neutral-900">{reports.revenue?.totalTransactions ?? 0}</p>
         </div>
       </div>
 
@@ -199,11 +204,11 @@ function OverviewTab() {
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div className="rounded-xl border border-neutral-200 p-4">
             <p className="text-sm text-neutral-500">Individual Plan</p>
-            <p className="mt-1 text-2xl font-bold text-neutral-900">{reports.users.byPlan.individual}</p>
+            <p className="mt-1 text-2xl font-bold text-neutral-900">{reports.users?.byPlan?.individual ?? 0}</p>
           </div>
           <div className="rounded-xl border border-neutral-200 p-4">
             <p className="text-sm text-neutral-500">Company Plan</p>
-            <p className="mt-1 text-2xl font-bold text-neutral-900">{reports.users.byPlan.company}</p>
+            <p className="mt-1 text-2xl font-bold text-neutral-900">{reports.users?.byPlan?.company ?? 0}</p>
           </div>
         </div>
       </div>

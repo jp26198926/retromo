@@ -54,6 +54,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.moderated !== undefined) patch.moderated = body.moderated;
   if (body.visibility !== undefined) patch.visibility = body.visibility;
   if (body.timerMinutes !== undefined) {
+    // timerMinutes is in minutes; store timerDuration in seconds
+    patch.timerDuration = body.timerMinutes * 60;
     if (body.timerMinutes > 0) {
       patch.timerEndsAt = new Date(Date.now() + body.timerMinutes * 60 * 1000);
     } else {

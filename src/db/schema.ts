@@ -86,6 +86,21 @@ export const teamMembers = pgTable("team_member", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// -----------------------------
+// Team invitations (for email-based invites)
+// -----------------------------
+export const teamInvitations = pgTable("team_invitation", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  teamId: uuid("team_id").notNull().references(() => teams.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  token: text("token").notNull().unique(), // unique accept token
+  invitedBy: text("invited_by").notNull().references(() => user.id, { onDelete: "cascade" }),
+  role: text("role").notNull().default("member"),
+  status: text("status").notNull().default("pending"), // pending | accepted | expired
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  acceptedAt: timestamp("accepted_at"),
+});
+
 export const retroVisibilityEnum = pgEnum("retro_visibility", ["regular", "private"]);
 export const retroEngagementEnum = pgEnum("retro_engagement", ["anonymous", "required_names"]);
 
@@ -253,6 +268,11 @@ export const teamRelations = relations(teams, ({ many, one }) => ({
 export const teamMemberRelations = relations(teamMembers, ({ one }) => ({
   team: one(teams, { fields: [teamMembers.teamId], references: [teams.id] }),
   user: one(user, { fields: [teamMembers.userId], references: [user.id] }),
+}));
+
+export const teamInvitationRelations = relations(teamInvitations, ({ one }) => ({
+  team: one(teams, { fields: [teamInvitations.teamId], references: [teams.id] }),
+  inviter: one(user, { fields: [teamInvitations.invitedBy], references: [user.id] }),
 }));
 
 export const retroRelations = relations(retros, ({ one, many }) => ({

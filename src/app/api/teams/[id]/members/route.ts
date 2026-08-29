@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { teams, teamMembers, user } from "@/db/schema";
+import { teams, teamMembers, teamInvitations, user } from "@/db/schema";
 import { getSession } from "@/lib/session";
 import { eq, and } from "drizzle-orm";
+import { sendTeamInvitationEmail, isEmailConfigured } from "@/lib/email";
+import { getAppSettings } from "@/lib/app-settings";
 
 // POST — add a member to a team (by email). Owner only.
+// If the user already has an account, they're added directly.
+// If not, a team invitation is created and an email is sent with
+// an accept link (and a registration link for users without an account).
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -29,28 +34,106 @@ export async function POST(
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Look up the team (for the email body)
+    const team = await db.query.teams.findFirst({ where: eq(teams.id, id) });
+    if (!team) {
+      return NextResponse.json({ error: "Team not found" }, { status: 404 });
+    }
+
+    // Check if the invited user already has an account
     const targetUser = await db.query.user.findFirst({
-      where: eq(user.email, email.trim().toLowerCase()),
+      where: eq(user.email, normalizedEmail),
     });
-    if (!targetUser) {
-      return NextResponse.json({ error: "No user found with that email. They must sign up first." }, { status: 404 });
+
+    if (targetUser) {
+      // User exists — add them directly as a member
+      const existing = await db.query.teamMembers.findFirst({
+        where: and(eq(teamMembers.teamId, id), eq(teamMembers.userId, targetUser.id)),
+      });
+      if (existing) {
+        return NextResponse.json({ error: "User is already a member" }, { status: 409 });
+      }
+
+      await db.insert(teamMembers).values({
+        id: crypto.randomUUID(),
+        teamId: id,
+        userId: targetUser.id,
+        role,
+      });
+
+      return NextResponse.json({
+        ok: true,
+        added: true,
+        userId: targetUser.id,
+        message: "Member added successfully.",
+      });
     }
 
-    const existing = await db.query.teamMembers.findFirst({
-      where: and(eq(teamMembers.teamId, id), eq(teamMembers.userId, targetUser.id)),
+    // User doesn't exist — create a team invitation and send an email
+    // Check if there's already a pending invitation for this email
+    const existingInvite = await db.query.teamInvitations.findFirst({
+      where: and(
+        eq(teamInvitations.teamId, id),
+        eq(teamInvitations.email, normalizedEmail),
+        eq(teamInvitations.status, "pending")
+      ),
     });
-    if (existing) {
-      return NextResponse.json({ error: "User is already a member" }, { status: 409 });
+    if (existingInvite) {
+      return NextResponse.json({
+        ok: true,
+        invited: true,
+        message: "An invitation has already been sent to this email.",
+      });
     }
 
-    await db.insert(teamMembers).values({
+    // Generate a unique token
+    const token = crypto.randomUUID();
+
+    await db.insert(teamInvitations).values({
       id: crypto.randomUUID(),
       teamId: id,
-      userId: targetUser.id,
+      email: normalizedEmail,
+      token,
+      invitedBy: session.user.id,
       role,
+      status: "pending",
     });
 
-    return NextResponse.json({ ok: true, userId: targetUser.id });
+    // Build the invitation URLs
+    const appSettings = await getAppSettings();
+    const baseUrl = process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const acceptUrl = `${baseUrl}/teams/invite?token=${token}`;
+    const signUpUrl = `${baseUrl}/sign-up?redirect=${encodeURIComponent(acceptUrl)}`;
+
+    // Try to send the invitation email
+    const emailResult = await sendTeamInvitationEmail({
+      to: normalizedEmail,
+      teamName: team.name,
+      inviterName: session.user.name,
+      acceptUrl,
+      signUpUrl,
+      hasAccount: false,
+    });
+
+    if (!emailResult.sent) {
+      // SMTP not configured — still return success since the invitation was created.
+      // Include the accept URL in the response so it can be shown in the UI for manual sharing.
+      return NextResponse.json({
+        ok: true,
+        invited: true,
+        message: `Invitation created. SMTP is not configured, so no email was sent. Share this link: ${acceptUrl}`,
+        inviteUrl: acceptUrl,
+        emailNotConfigured: true,
+      });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      invited: true,
+      message: `Invitation sent to ${normalizedEmail}. They will receive an email with a link to join the team.`,
+    });
   } catch (e) {
     console.error("[POST /api/teams/[id]/members]", e);
     return NextResponse.json({ error: "Failed to add member" }, { status: 500 });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { teams, teamMembers, retros, actionPoints } from "@/db/schema";
+import { teams, teamMembers, retros, actionPoints, teamInvitations } from "@/db/schema";
 import { getSession } from "@/lib/session";
 import { eq, and } from "drizzle-orm";
 
@@ -49,6 +49,31 @@ export async function GET(
       teamActionPoints = all.filter((ap) => ap.retro && retroIds.includes(ap.retro.id));
     }
 
+    // pending invitations (visible to owner/admin only)
+    let pendingInvitations: Array<{
+      id: string;
+      email: string;
+      role: string;
+      status: string;
+      createdAt: string;
+    }> = [];
+    if (myMember && (myMember.role === "owner" || myMember.role === "admin")) {
+      const invites = await db
+        .select({
+          id: teamInvitations.id,
+          email: teamInvitations.email,
+          role: teamInvitations.role,
+          status: teamInvitations.status,
+          createdAt: teamInvitations.createdAt,
+        })
+        .from(teamInvitations)
+        .where(and(eq(teamInvitations.teamId, id), eq(teamInvitations.status, "pending")));
+      pendingInvitations = invites.map((i) => ({
+        ...i,
+        createdAt: i.createdAt.toISOString(),
+      }));
+    }
+
     // flatten members out of team for easier frontend access
     const { members, ...teamFields } = team;
 
@@ -59,6 +84,7 @@ export async function GET(
       isMember: !!myMember,
       retros: teamRetros,
       actionPoints: teamActionPoints,
+      pendingInvitations,
     });
   } catch (e) {
     console.error("[GET /api/teams/[id]]", e);

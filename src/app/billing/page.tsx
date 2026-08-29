@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/Button";
+import { ConfirmModal } from "@/components/ConfirmModal";
 import { PayPalCheckout } from "@/components/PayPalCheckout";
 import { useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ export default function BillingPage() {
   const [showChangePlan, setShowChangePlan] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelMsg, setCancelMsg] = useState<string | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   function fetchSub() {
     fetch("/api/subscription")
@@ -57,8 +59,12 @@ export default function BillingPage() {
   }, [sessionData?.session]);
 
   async function handleCancel() {
-    if (!confirm("Cancel your subscription? You will keep access until your current billing period ends (non-refundable).")) return;
+    setShowCancelModal(true);
+  }
+
+  async function performCancel() {
     setCancelLoading(true);
+    setCancelMsg(null);
     try {
       const res = await fetch("/api/subscription/cancel", { method: "POST" });
       const data = await res.json();
@@ -72,6 +78,7 @@ export default function BillingPage() {
       setCancelMsg("Failed to cancel subscription");
     } finally {
       setCancelLoading(false);
+      setShowCancelModal(false);
     }
   }
 
@@ -292,6 +299,18 @@ export default function BillingPage() {
         </section>
       </main>
       <Footer />
+
+      {/* Cancel subscription confirmation modal */}
+      <ConfirmModal
+        open={showCancelModal}
+        title="Cancel subscription"
+        message="Cancel your subscription? You will keep access until your current billing period ends (non-refundable). After that, you will revert to the free Anonymous plan."
+        confirmLabel="Yes, cancel subscription"
+        variant="danger"
+        loading={cancelLoading}
+        onConfirm={performCancel}
+        onCancel={() => setShowCancelModal(false)}
+      />
     </div>
   );
 }

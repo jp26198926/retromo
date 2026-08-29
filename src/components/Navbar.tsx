@@ -68,6 +68,11 @@ export function Navbar() {
                   Dashboard
                 </Button>
               </Link>
+              <Link href="/retro">
+                <Button variant="ghost" size="md">
+                  My retros
+                </Button>
+              </Link>
               <Link href="/teams">
                 <Button variant="ghost" size="md">
                   Teams
@@ -163,6 +168,9 @@ export function Navbar() {
               <>
                 <Link href="/dashboard" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-100">
                   Dashboard
+                </Link>
+                <Link href="/retro" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-100">
+                  My retros
                 </Link>
                 <Link href="/teams" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-100">
                   Teams

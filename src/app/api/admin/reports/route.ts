@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { user, billingHistory, retros, teams, actionPoints, cards } from "@/db/schema";
-import { eq, gt, and, sql, count, sum } from "drizzle-orm";
+import { eq, gt, and, sql, count } from "drizzle-orm";
 import { getAdminSession } from "@/lib/admin";
 
 // GET — aggregate reports / stats for the admin dashboard
@@ -37,10 +37,12 @@ export async function GET() {
       .from(user)
       .where(eq(user.subscriptionStatus, "cancelled"));
 
-    // Total revenue (sum of completed billing-history amounts that aren't 0.00 cancellations)
-    // We sum amounts for type in (subscribe, change_plan) and status = completed.
+    // Total revenue — sum of completed billing-history amounts for subscribe/change_plan.
+    // The amount column is stored as text, so we cast to numeric before summing.
     const revenueRows = await db
-      .select({ total: sum(billingHistory.amount) })
+      .select({
+        total: sql<string>`COALESCE(SUM(${billingHistory.amount}::numeric), 0)::text`,
+      })
       .from(billingHistory)
       .where(
         and(
@@ -55,7 +57,9 @@ export async function GET() {
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
     const monthRevenueRows = await db
-      .select({ total: sum(billingHistory.amount) })
+      .select({
+        total: sql<string>`COALESCE(SUM(${billingHistory.amount}::numeric), 0)::text`,
+      })
       .from(billingHistory)
       .where(
         and(
@@ -83,9 +87,9 @@ export async function GET() {
 
     return NextResponse.json({
       users: {
-        total: totalUsers,
-        activeSubs,
-        cancelledSubs,
+        total: totalUsers ?? 0,
+        activeSubs: activeSubs ?? 0,
+        cancelledSubs: cancelledSubs ?? 0,
         byPlan: {
           individual: individualCount[0]?.value || 0,
           company: companyCount[0]?.value || 0,
@@ -94,14 +98,14 @@ export async function GET() {
       revenue: {
         total: totalRevenue,
         thisMonth: monthRevenue,
-        totalTransactions,
+        totalTransactions: totalTransactions ?? 0,
       },
       content: {
-        totalRetros,
-        activeRetros,
-        totalTeams,
-        totalCards,
-        totalActionPoints,
+        totalRetros: totalRetros ?? 0,
+        activeRetros: activeRetros ?? 0,
+        totalTeams: totalTeams ?? 0,
+        totalCards: totalCards ?? 0,
+        totalActionPoints: totalActionPoints ?? 0,
       },
     });
   } catch (e) {

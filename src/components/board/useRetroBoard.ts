@@ -18,6 +18,7 @@ export type RetroState = {
     timerEndsAt: string | null;
     plan: string;
     shareToken: string;
+    ownerId: string | null;
   };
   columns: { id: string; name: string; description: string | null; color: string; imageUrl: string | null; position: number }[];
   cards: CardData[];

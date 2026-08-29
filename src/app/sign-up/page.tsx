@@ -20,7 +20,10 @@ function SignUpForm() {
   const router = useRouter();
   const params = useSearchParams();
   const plan = params.get("plan");
-  const callbackURL = plan ? `/dashboard?plan=${plan}` : "/dashboard";
+  const redirect = params.get("redirect");
+  // If a redirect URL is provided (e.g. from a team invitation), use it after signup.
+  // Otherwise fall back to the plan-based dashboard URL.
+  const callbackURL = redirect || (plan ? `/dashboard?plan=${plan}` : "/dashboard");
   const { providers } = useSocialProviders();
 
   const [name, setName] = useState("");

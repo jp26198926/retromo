@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/Button";
+import { ConfirmModal } from "@/components/ConfirmModal";
 import { useSession } from "@/lib/auth-client";
 import { timeAgo } from "@/lib/utils";
 
@@ -29,6 +30,13 @@ interface ActionPoint {
   dueDate: string | null;
   retro: { id: string; title: string };
 }
+interface PendingInvitation {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  createdAt: string;
+}
 interface TeamDetail {
   team: { id: string; name: string; color: string; ownerId: string | null; createdAt: string };
   members: Member[];
@@ -36,6 +44,7 @@ interface TeamDetail {
   isMember: boolean;
   retros: Retro[];
   actionPoints: ActionPoint[];
+  pendingInvitations?: PendingInvitation[];
 }
 
 export default function TeamDetailPage() {
@@ -47,9 +56,14 @@ export default function TeamDetailPage() {
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteMsg, setInviteMsg] = useState("");
+  const [inviteLoading, setInviteLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState("#6366f1");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [removeMember, setRemoveMember] = useState<{ userId: string; name: string } | null>(null);
+  const [removingMember, setRemovingMember] = useState(false);
 
   const load = () => {
     fetch(`/api/teams/${params.id}`)
@@ -72,6 +86,7 @@ export default function TeamDetailPage() {
 
   const handleInvite = async () => {
     setInviteMsg("");
+    setInviteLoading(true);
     const res = await fetch(`/api/teams/${params.id}/members`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -80,16 +95,19 @@ export default function TeamDetailPage() {
     const d = await res.json();
     if (res.ok) {
       setInviteEmail("");
-      setInviteMsg("Member added!");
+      setInviteMsg(d.message || "Done!");
       load();
     } else {
       setInviteMsg(d.error || "Failed to add member");
     }
+    setInviteLoading(false);
   };
 
-  const handleRemoveMember = async (userId: string, name: string) => {
-    if (!confirm(`Remove ${name} from this team?`)) return;
+  const handleRemoveMember = async (userId: string) => {
+    setRemovingMember(true);
     await fetch(`/api/teams/${params.id}/members?userId=${userId}`, { method: "DELETE" });
+    setRemovingMember(false);
+    setRemoveMember(null);
     load();
   };
 
@@ -106,9 +124,11 @@ export default function TeamDetailPage() {
   };
 
   const handleDeleteTeam = async () => {
-    if (!confirm("Delete this team? All retros will be unlinked. This cannot be undone.")) return;
+    setDeleting(true);
     const res = await fetch(`/api/teams/${params.id}`, { method: "DELETE" });
+    setDeleting(false);
     if (res.ok) {
+      setShowDeleteModal(false);
       window.location.href = "/teams";
     }
   };
@@ -198,7 +218,7 @@ export default function TeamDetailPage() {
                 ) : (
                   <>
                     <Button size="sm" variant="outline" onClick={() => setEditing(true)}>Edit</Button>
-                    <Button size="sm" variant="danger" onClick={handleDeleteTeam}>Delete team</Button>
+                    <Button size="sm" variant="danger" onClick={() => setShowDeleteModal(true)}>Delete team</Button>
                   </>
                 )}
               </div>
@@ -227,7 +247,9 @@ export default function TeamDetailPage() {
                     placeholder="user@email.com"
                     className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
                   />
-                  <Button size="sm" className="mt-2 w-full" onClick={handleInvite}>Add member</Button>
+                  <Button size="sm" className="mt-2 w-full" onClick={handleInvite} disabled={inviteLoading}>
+                    {inviteLoading ? "Sending…" : "Add member"}
+                  </Button>
                   {inviteMsg && <p className="mt-2 text-sm text-neutral-600">{inviteMsg}</p>}
                 </div>
               )}
@@ -253,7 +275,7 @@ export default function TeamDetailPage() {
                       )}
                       {(isOwner || m.user.id === session?.user?.id) && m.role !== "owner" && (
                         <button
-                          onClick={() => handleRemoveMember(m.user.id, m.user.name)}
+                          onClick={() => setRemoveMember({ userId: m.user.id, name: m.user.name })}
                           className="text-xs text-red-500 hover:text-red-700"
                         >
                           Remove
@@ -263,6 +285,31 @@ export default function TeamDetailPage() {
                   </li>
                 ))}
               </ul>
+
+              {/* Pending invitations (owner/admin only) */}
+              {isOwner && data.pendingInvitations && data.pendingInvitations.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-sm font-semibold text-neutral-700">Pending invitations</h3>
+                  <ul className="mt-3 space-y-2">
+                    {data.pendingInvitations.map((inv) => (
+                      <li
+                        key={inv.id}
+                        className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-neutral-900">{inv.email}</p>
+                          <p className="text-xs text-neutral-500">
+                            Invited {timeAgo(inv.createdAt)} · {inv.role}
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          Pending
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </section>
 
             {/* Retros + Action Points */}
@@ -343,6 +390,30 @@ export default function TeamDetailPage() {
         </div>
       </main>
       <Footer />
+
+      {/* Delete team confirmation modal */}
+      <ConfirmModal
+        open={showDeleteModal}
+        title="Delete team"
+        message={`Are you sure you want to delete "${data.team.name}"? All retros will be unlinked. This action cannot be undone.`}
+        confirmLabel="Delete team"
+        variant="danger"
+        loading={deleting}
+        onConfirm={handleDeleteTeam}
+        onCancel={() => setShowDeleteModal(false)}
+      />
+
+      {/* Remove member confirmation modal */}
+      <ConfirmModal
+        open={!!removeMember}
+        title="Remove member"
+        message={`Are you sure you want to remove ${removeMember?.name || "this member"} from the team?`}
+        confirmLabel="Remove member"
+        variant="danger"
+        loading={removingMember}
+        onConfirm={() => removeMember && handleRemoveMember(removeMember.userId)}
+        onCancel={() => setRemoveMember(null)}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useRetroBoard } from "@/components/board/useRetroBoard";
@@ -8,6 +8,7 @@ import { Column } from "@/components/board/Column";
 import { ActionPointsPanel } from "@/components/board/ActionPointsPanel";
 import { Button } from "@/components/Button";
 import { Logo } from "@/components/Logo";
+import { useAdmin } from "@/components/useAdmin";
 import { cn, timeAgo } from "@/lib/utils";
 import { useSession, signOut } from "@/lib/auth-client";
 
@@ -196,6 +197,27 @@ export default function RetroBoardPage() {
   const isFacilitator = state?.currentParticipant?.isFacilitator || false;
   const showAuthor = state?.retro?.engagement === "required_names";
   const isLoggedIn = !!sessionData?.session && !!sessionData?.user;
+  const { isAdmin } = useAdmin();
+  // Host = the user who created the retro (ownerId matches current user).
+  // Only the host or an admin can access the timer and lock controls.
+  const isHost = !!(isLoggedIn && state?.retro?.ownerId && state.retro.ownerId === sessionData?.user?.id);
+  const canControl = isHost || isAdmin;
+
+  // Auto-lock: when the timer was running and has expired, automatically lock the board.
+  // We use a ref to avoid calling the lock API multiple times.
+  const autoLockedRef = useRef(false);
+  useEffect(() => {
+    if (!state || autoLockedRef.current) return;
+    const timerEndsAt = state.retro.timerEndsAt ? new Date(state.retro.timerEndsAt).getTime() : 0;
+    if (timerEndsAt > 0 && Date.now() >= timerEndsAt && !state.retro.locked) {
+      autoLockedRef.current = true;
+      fetch(`/api/retros/${retroId}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locked: true }),
+      }).then(() => refresh()).catch(() => { autoLockedRef.current = false; });
+    }
+  }, [state, retroId, refresh]);
   const sortedColumns = useMemo(
     () => [...(state?.columns ?? [])].sort((a, b) => a.position - b.position),
     [state?.columns]
@@ -362,29 +384,43 @@ export default function RetroBoardPage() {
       {/* Facilitator toolbar */}
       <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-neutral-200 bg-white px-3 py-1.5 sm:px-4">
         <span className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-          {isFacilitator ? "Facilitator tools" : "Tools"}
+          {canControl ? "Host tools" : "Tools"}
         </span>
 
         <button onClick={toggleSecretVoting} className={cn("rounded-md px-2 py-1 text-xs", retroData.secretVoting ? "bg-indigo-100 text-indigo-700" : "bg-neutral-100 text-neutral-600")}>
           Secret voting {retroData.secretVoting ? "on" : "off"}
         </button>
 
-        <select
-          value={0}
-          onChange={(e) => setTimer(Number(e.target.value))}
-          className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs"
-        >
-          <option value={0}>Timer: off</option>
-          <option value={1}>1 min</option>
-          <option value={3}>3 min</option>
-          <option value={5}>5 min</option>
-          <option value={10}>10 min</option>
-          <option value={15}>15 min</option>
-        </select>
+        {/* Timer — only host or admin can set it */}
+        {canControl ? (
+          <select
+            value={retroData.timerDuration || 0}
+            onChange={(e) => setTimer(Number(e.target.value))}
+            className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs"
+          >
+            <option value={0}>Timer: off</option>
+            <option value={1}>1 min</option>
+            <option value={3}>3 min</option>
+            <option value={5}>5 min</option>
+            <option value={10}>10 min</option>
+            <option value={15}>15 min</option>
+          </select>
+        ) : (
+          <span className="rounded-md bg-neutral-50 px-2 py-1 text-xs text-neutral-400">
+            Timer: {retroData.timerDuration ? `${retroData.timerDuration / 60} min` : "off"}
+          </span>
+        )}
 
-        <button onClick={toggleLock} className={cn("rounded-md px-2 py-1 text-xs", retroData.locked ? "bg-amber-100 text-amber-700" : "bg-neutral-100 text-neutral-600")}>
-          {retroData.locked ? "🔒 Locked" : "🔓 Editable"}
-        </button>
+        {/* Lock toggle — only host or admin can toggle */}
+        {canControl ? (
+          <button onClick={toggleLock} className={cn("rounded-md px-2 py-1 text-xs", retroData.locked ? "bg-amber-100 text-amber-700" : "bg-neutral-100 text-neutral-600")}>
+            {retroData.locked ? "🔒 Locked" : "🔓 Editable"}
+          </button>
+        ) : (
+          <span className={cn("rounded-md px-2 py-1 text-xs", retroData.locked ? "bg-amber-100 text-amber-700" : "bg-neutral-100 text-neutral-600")}>
+            {retroData.locked ? "🔒 Locked" : "🔓 Editable"}
+          </span>
+        )}
 
         <div className="ml-auto flex items-center gap-2">
           <button

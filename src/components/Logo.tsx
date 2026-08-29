@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useAppSettings } from "@/components/useAppSettings";
+import { useSession } from "@/lib/auth-client";
 import { useEffect, useState } from "react";
 
 export function Logo({ className = "" }: { className?: string }) {
   const { settings } = useAppSettings();
+  const { data: session } = useSession();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -14,8 +16,13 @@ export function Logo({ className = "" }: { className?: string }) {
   // then switch to the admin-configured name after mount.
   const displayName = mounted ? appName : "RetroMo";
 
+  // If the user is logged in, the logo links to the dashboard.
+  // If not logged in, it links to the homepage.
+  const loggedIn = mounted && !!session?.session && !!session?.user;
+  const href = loggedIn ? "/dashboard" : "/";
+
   return (
-    <Link href="/" className={`flex items-center gap-2 font-bold text-lg ${className}`}>
+    <Link href={href} className={`flex items-center gap-2 font-bold text-lg ${className}`}>
       {mounted && settings.appIconUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
