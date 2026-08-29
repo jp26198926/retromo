@@ -11,6 +11,7 @@ type ConfirmModalProps = {
   cancelLabel?: string;
   variant?: "primary" | "danger" | "outline";
   loading?: boolean;
+  error?: string | null;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -23,6 +24,7 @@ export function ConfirmModal({
   cancelLabel = "Cancel",
   variant = "primary",
   loading = false,
+  error = null,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
@@ -49,6 +51,9 @@ export function ConfirmModal({
       <div className="relative w-full max-w-md animate-fade-in rounded-2xl bg-white p-6 shadow-2xl">
         <h3 className="text-lg font-semibold text-neutral-900">{title}</h3>
         <p className="mt-3 text-sm text-neutral-600">{message}</p>
+        {error && (
+          <p className="mt-2 text-sm text-red-600">{error}</p>
+        )}
         <div className="mt-6 flex justify-end gap-3">
           <Button
             variant="outline"

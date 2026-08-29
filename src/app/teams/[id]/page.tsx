@@ -7,7 +7,6 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/Button";
 import { ConfirmModal } from "@/components/ConfirmModal";
-import { useSession } from "@/lib/auth-client";
 import { timeAgo } from "@/lib/utils";
 
 interface Member {
@@ -49,7 +48,6 @@ interface TeamDetail {
 
 export default function TeamDetailPage() {
   const params = useParams<{ id: string }>();
-  const { data: session } = useSession();
   const [data, setData] = useState<TeamDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +62,7 @@ export default function TeamDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [removeMember, setRemoveMember] = useState<{ userId: string; name: string } | null>(null);
   const [removingMember, setRemovingMember] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   const load = () => {
     fetch(`/api/teams/${params.id}`)
@@ -104,11 +103,17 @@ export default function TeamDetailPage() {
   };
 
   const handleRemoveMember = async (userId: string) => {
+    setRemoveError(null);
     setRemovingMember(true);
-    await fetch(`/api/teams/${params.id}/members?userId=${userId}`, { method: "DELETE" });
+    const res = await fetch(`/api/teams/${params.id}/members?userId=${userId}`, { method: "DELETE" });
     setRemovingMember(false);
-    setRemoveMember(null);
-    load();
+    if (res.ok) {
+      setRemoveMember(null);
+      load();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setRemoveError(d.error || "Failed to remove member");
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -273,7 +278,7 @@ export default function TeamDetailPage() {
                       {m.role === "owner" && (
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Owner</span>
                       )}
-                      {(isOwner || m.user.id === session?.user?.id) && m.role !== "owner" && (
+                      {isOwner && m.role !== "owner" && (
                         <button
                           onClick={() => setRemoveMember({ userId: m.user.id, name: m.user.name })}
                           className="text-xs text-red-500 hover:text-red-700"
@@ -411,8 +416,9 @@ export default function TeamDetailPage() {
         confirmLabel="Remove member"
         variant="danger"
         loading={removingMember}
+        error={removeError}
         onConfirm={() => removeMember && handleRemoveMember(removeMember.userId)}
-        onCancel={() => setRemoveMember(null)}
+        onCancel={() => { setRemoveMember(null); setRemoveError(null); }}
       />
     </div>
   );

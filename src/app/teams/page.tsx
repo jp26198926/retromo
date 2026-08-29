@@ -16,6 +16,11 @@ interface TeamItem {
   createdAt: string;
 }
 
+interface SubscriptionInfo {
+  effectivePlan: string;
+  hasActiveAccess: boolean;
+}
+
 const TEAM_COLORS = [
   "#6366f1", "#ec4899", "#14b8a6", "#f59e0b",
   "#ef4444", "#8b5cf6", "#06b6d4", "#84cc16",
@@ -29,6 +34,8 @@ export default function TeamsPage() {
   const [name, setName] = useState("");
   const [color, setColor] = useState(TEAM_COLORS[0]);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
 
   const loadTeams = () => {
     fetch("/api/teams")
@@ -43,10 +50,29 @@ export default function TeamsPage() {
       return;
     }
     loadTeams();
+    // Fetch subscription to determine if the user can create teams
+    fetch("/api/subscription")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.effectivePlan !== undefined) {
+          setSubscription({
+            effectivePlan: d.effectivePlan,
+            hasActiveAccess: d.hasActiveAccess,
+          });
+        }
+      })
+      .catch(() => {});
   }, [session]);
+
+  // Anonymous plan users cannot create or manage teams.
+  const canCreateTeams =
+    !!subscription &&
+    subscription.hasActiveAccess &&
+    subscription.effectivePlan !== "anonymous";
 
   const handleCreate = async () => {
     if (!name.trim()) return;
+    setCreateError(null);
     setCreating(true);
     const res = await fetch("/api/teams", {
       method: "POST",
@@ -58,6 +84,9 @@ export default function TeamsPage() {
       setName("");
       setShowCreate(false);
       loadTeams();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setCreateError(d.error || "Failed to create team");
     }
   };
 
@@ -88,10 +117,25 @@ export default function TeamsPage() {
               <h1 className="text-3xl font-bold tracking-tight text-neutral-900">Teams</h1>
               <p className="mt-1 text-neutral-600">Group retros and track action points across your team.</p>
             </div>
-            <Button size="lg" onClick={() => setShowCreate((v) => !v)}>
-              {showCreate ? "Cancel" : "+ New team"}
-            </Button>
+            {canCreateTeams && (
+              <Button size="lg" onClick={() => setShowCreate((v) => !v)}>
+                {showCreate ? "Cancel" : "+ New team"}
+              </Button>
+            )}
           </div>
+
+          {/* Anonymous plan — upgrade prompt */}
+          {session && subscription && !canCreateTeams && (
+            <div className="mt-6 rounded-2xl border border-indigo-200 bg-indigo-50 p-6 text-center">
+              <h2 className="text-lg font-semibold text-neutral-900">Upgrade to manage teams</h2>
+              <p className="mx-auto mt-2 max-w-md text-sm text-neutral-600">
+                The Anonymous plan does not include team management. Upgrade to the Individual or Company plan to create teams, invite members, and track action points together.
+              </p>
+              <Link href="/billing" className="mt-4 inline-block">
+                <Button>Upgrade your plan</Button>
+              </Link>
+            </div>
+          )}
 
           {showCreate && (
             <div className="mt-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
@@ -124,6 +168,9 @@ export default function TeamsPage() {
                 <Button onClick={handleCreate} disabled={creating || !name.trim()}>
                   {creating ? "Creating…" : "Create team"}
                 </Button>
+                {createError && (
+                  <p className="text-sm text-red-600">{createError}</p>
+                )}
               </div>
             </div>
           )}
@@ -134,7 +181,9 @@ export default function TeamsPage() {
             ) : teams.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-12 text-center">
                 <p className="text-neutral-500">No teams yet.</p>
-                <Button className="mt-3" onClick={() => setShowCreate(true)}>Create your first team</Button>
+                {canCreateTeams && (
+                  <Button className="mt-3" onClick={() => setShowCreate(true)}>Create your first team</Button>
+                )}
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

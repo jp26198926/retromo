@@ -140,7 +140,7 @@ export async function POST(
   }
 }
 
-// DELETE — remove a member. Owner can remove anyone; members can remove themselves.
+// DELETE — remove a member. Only the team owner (host/creator) can remove members.
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -162,19 +162,13 @@ export async function DELETE(
       where: and(eq(teamMembers.teamId, id), eq(teamMembers.userId, session.user.id)),
     });
 
-    const isOwner = myMember?.role === "owner";
-    const isSelf = userIdToRemove === session.user.id;
-
-    if (!isOwner && !isSelf) {
-      return NextResponse.json({ error: "You can only remove yourself unless you are the owner" }, { status: 403 });
+    if (!myMember || myMember.role !== "owner") {
+      return NextResponse.json({ error: "Only the team owner can remove members" }, { status: 403 });
     }
 
-    // prevent owner from removing themselves if they're the only owner
-    if (isOwner && isSelf) {
-      const ownerId = (await db.query.teams.findFirst({ where: eq(teams.id, id) }))?.ownerId;
-      if (ownerId === session.user.id) {
-        return NextResponse.json({ error: "Transfer ownership before leaving. Delete the team instead." }, { status: 400 });
-      }
+    // Prevent the owner from removing themselves via this endpoint
+    if (userIdToRemove === session.user.id) {
+      return NextResponse.json({ error: "Transfer ownership before leaving. Delete the team instead." }, { status: 400 });
     }
 
     await db
