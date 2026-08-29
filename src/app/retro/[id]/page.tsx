@@ -391,10 +391,11 @@ export default function RetroBoardPage() {
           Secret voting {retroData.secretVoting ? "on" : "off"}
         </button>
 
-        {/* Timer — only host or admin can set it */}
+        {/* Timer — only host or admin can set it.
+            timerDuration is stored in seconds; dropdown options are in minutes. */}
         {canControl ? (
           <select
-            value={retroData.timerDuration || 0}
+            value={Math.round((retroData.timerDuration || 0) / 60)}
             onChange={(e) => setTimer(Number(e.target.value))}
             className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs"
           >
@@ -407,7 +408,7 @@ export default function RetroBoardPage() {
           </select>
         ) : (
           <span className="rounded-md bg-neutral-50 px-2 py-1 text-xs text-neutral-400">
-            Timer: {retroData.timerDuration ? `${retroData.timerDuration / 60} min` : "off"}
+            Timer: {retroData.timerDuration ? `${Math.round(retroData.timerDuration / 60)} min` : "off"}
           </span>
         )}
 

@@ -5,7 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/Button";
 import { ConfirmModal } from "@/components/ConfirmModal";
-import { PayPalCheckout } from "@/components/PayPalCheckout";
+import { UpgradePlanModal } from "@/components/UpgradePlanModal";
 import { useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +37,7 @@ export default function BillingPage() {
   const { data: sessionData, isPending } = useSession();
   const [sub, setSub] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showChangePlan, setShowChangePlan] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelMsg, setCancelMsg] = useState<string | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -118,10 +118,6 @@ export default function BillingPage() {
     ? new Date(sub.subscriptionCancelledAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
     : null;
 
-  const otherPlan = sub?.subscriptionPlan === "individual" ? "company" : "individual";
-  const otherPlanLabel = otherPlan === "individual" ? "Individual ($10/mo)" : "Company ($20/mo)";
-  const otherPlanAmount = otherPlan === "individual" ? "10.00" : "20.00";
-
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar />
@@ -182,9 +178,9 @@ export default function BillingPage() {
             {/* Actions */}
             <div className="mt-6 flex flex-wrap gap-3">
               {(sub?.subscriptionPlan === "anonymous" || !hasAccess) ? (
-                <a href="/plans">
-                  <Button variant="primary">Upgrade your plan</Button>
-                </a>
+                <Button variant="primary" onClick={() => setShowUpgradeModal(true)}>
+                  Upgrade your plan
+                </Button>
               ) : (
                 <>
                   {!isCancelled && (
@@ -198,40 +194,13 @@ export default function BillingPage() {
                   )}
                   <Button
                     variant="outline"
-                    onClick={() => setShowChangePlan((v) => !v)}
+                    onClick={() => setShowUpgradeModal(true)}
                   >
-                    {showChangePlan ? "Close" : "Change plan"}
+                    Change plan
                   </Button>
                 </>
               )}
             </div>
-
-            {/* Change plan panel */}
-            {showChangePlan && hasAccess && (
-              <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/50 p-4">
-                <h3 className="text-sm font-semibold text-neutral-900">
-                  Switch to the {otherPlanLabel} plan
-                </h3>
-                <p className="mt-1 text-xs text-neutral-600">
-                  You will be charged for the new plan and your subscription will switch immediately.
-                  Your previous plan&apos;s remaining time is non-refundable, but you keep access
-                  to all features of the new plan for a full month.
-                </p>
-                <div className="mt-3">
-                  <PayPalCheckout
-                    plan={otherPlan as "individual" | "company"}
-                    amount={otherPlanAmount}
-                    type="change_plan"
-                    onSuccess={() => {
-                      setTimeout(() => {
-                        setShowChangePlan(false);
-                        fetchSub();
-                      }, 1500);
-                    }}
-                  />
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Billing history */}
@@ -310,6 +279,17 @@ export default function BillingPage() {
         loading={cancelLoading}
         onConfirm={performCancel}
         onCancel={() => setShowCancelModal(false)}
+      />
+
+      {/* Upgrade plan modal */}
+      <UpgradePlanModal
+        open={showUpgradeModal}
+        currentPlan={sub?.subscriptionPlan || "anonymous"}
+        onCancel={() => setShowUpgradeModal(false)}
+        onSuccess={() => {
+          setShowUpgradeModal(false);
+          fetchSub();
+        }}
       />
     </div>
   );

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/Button";
+import { MessageUs } from "@/components/MessageUs";
 
 const coreFeatures = [
   {
@@ -68,11 +69,6 @@ export default function Home() {
                     Create free, anonymous retro
                   </Button>
                 </Link>
-                <Link href="/plans">
-                  <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                    Start your free trial
-                  </Button>
-                </Link>
               </div>
               <p className="mt-4 text-sm text-neutral-500">No credit card required · Free forever plan</p>
             </div>
@@ -129,53 +125,17 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Testimonials */}
-        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight text-neutral-900 sm:text-4xl">
-              What users like about RetroMo
-            </h2>
-          </div>
-          <div className="mt-12 grid gap-6 sm:grid-cols-3">
-            {[
-              { quote: "We were looking for a tool that was purpose-built for sprint retros, and RetroMo is by far the best we've found!", name: "Jean McCabe", role: "Product Owner at My Wellbeing" },
-              { quote: "RetroMo strikes the right balance between functionality and low barrier to entry, enabling new users to pick it up with ease.", name: "Greg Levow", role: "COO at Verblio" },
-              { quote: "We work with multiple clients worldwide. We needed a tool that's easy to connect to and lightweight — RetroMo is the best out there!", name: "Katarzyna Ryniak", role: "Product Manager at Upside" },
-            ].map((t) => (
-              <figure key={t.name} className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-                <blockquote className="text-sm text-neutral-700">“{t.quote}”</blockquote>
-                <figcaption className="mt-4 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 font-semibold text-indigo-700">
-                    {t.name.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-neutral-900">{t.name}</div>
-                    <div className="text-xs text-neutral-500">{t.role}</div>
-                  </div>
-                </figcaption>
-              </figure>
-            ))}
-          </div>
-        </section>
-
-        {/* CTA */}
+        {/* Message Us */}
         <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6">
-          <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-600 px-6 py-16 text-center text-white sm:px-12">
-            <h2 className="text-3xl font-bold sm:text-4xl">Let's go Retro</h2>
-            <p className="mx-auto mt-4 max-w-xl text-indigo-100">
-              Create a free retrospective and travel in time with your team.
-            </p>
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link href="/new-retrospective">
-                <Button size="lg" variant="secondary" className="w-full sm:w-auto bg-white text-indigo-700 hover:bg-indigo-50">
-                  Create a free retro
-                </Button>
-              </Link>
-              <Link href="/plans">
-                <Button size="lg" variant="outline" className="w-full border-white/40 text-white hover:bg-white/10 sm:w-auto">
-                  Check out our plans
-                </Button>
-              </Link>
+          <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-600 px-6 py-16 text-white sm:px-12">
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-bold sm:text-4xl">Message Us</h2>
+              <p className="mx-auto mt-4 max-w-xl text-indigo-100">
+                Have a question, suggestion, or just want to say hello? Send us a message and we'll get back to you.
+              </p>
+            </div>
+            <div className="mx-auto mt-10 max-w-xl">
+              <MessageUs />
             </div>
           </div>
         </section>

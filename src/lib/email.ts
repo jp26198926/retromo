@@ -153,3 +153,41 @@ export async function sendTeamInvitationEmail({
 
   return sendEmail({ to, subject, html, text });
 }
+
+/**
+ * Send a contact/message email to the admin.
+ * Uses ADMIN_EMAIL env var as the recipient.
+ */
+export async function sendContactMessage({
+  name,
+  email,
+  message,
+}: {
+  name: string;
+  email: string;
+  message: string;
+}): Promise<{ sent: boolean; error?: string }> {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (!adminEmail) {
+    return { sent: false, error: "Admin email not configured" };
+  }
+
+  const subject = `New message from ${name} via RetroMo contact form`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h2 style="color: #4f46e5;">New contact message</h2>
+      <p style="color: #333; font-size: 15px;"><strong>From:</strong> ${name}</p>
+      <p style="color: #333; font-size: 15px;"><strong>Email:</strong> ${email}</p>
+      <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+      <h3 style="color: #333; font-size: 15px;">Message:</h3>
+      <p style="color: #555; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${message}</p>
+      <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
+      <p style="color: #999; font-size: 12px;">
+        This message was sent via the RetroMo contact form on the homepage.
+      </p>
+    </div>
+  `;
+  const text = `New contact message from ${name} (${email})\n\nMessage:\n${message}`;
+
+  return sendEmail({ to: adminEmail, subject, html, text });
+}
