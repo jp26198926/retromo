@@ -2,6 +2,11 @@ import { pgTable, text, timestamp, boolean, integer, pgEnum, uuid, jsonb } from 
 import { relations } from "drizzle-orm";
 
 // -----------------------------
+// Enums (declared early so tables can reference them)
+// -----------------------------
+export const planEnum = pgEnum("plan", ["anonymous", "individual", "company"]);
+
+// -----------------------------
 // better-auth tables
 // -----------------------------
 export const user = pgTable("user", {
@@ -13,6 +18,11 @@ export const user = pgTable("user", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   isAnonymous: boolean("is_anonymous").notNull().default(false),
+  // subscription / billing fields
+  subscriptionPlan: planEnum("subscription_plan").notNull().default("anonymous"),
+  subscriptionStatus: text("subscription_status").notNull().default("none"), // none | active | cancelled | past_due
+  paypalSubscriptionId: text("paypal_subscription_id"),
+  subscriptionCurrentPeriodEnd: timestamp("subscription_current_period_end"),
 });
 
 export const session = pgTable("session", {
@@ -55,8 +65,6 @@ export const verification = pgTable("verification", {
 // -----------------------------
 // App tables
 // -----------------------------
-
-export const planEnum = pgEnum("plan", ["anonymous", "individual", "company"]);
 
 export const teams = pgTable("team", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -115,6 +123,8 @@ export const retroParticipants = pgTable("retro_participant", {
   // for anonymous guests we keep a transient name/color
   displayName: text("display_name"),
   color: text("color"),
+  // anonymous browser session id — used to dedup guests per browser tab/session
+  anonymousSessionId: text("anonymous_session_id"),
   isFacilitator: boolean("is_facilitator").notNull().default(false),
   ready: boolean("ready").notNull().default(false),
   joinedAt: timestamp("joined_at").notNull().defaultNow(),

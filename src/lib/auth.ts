@@ -37,6 +37,18 @@ export const auth = betterAuth({
         type: "boolean",
         defaultValue: false,
       },
+      subscriptionPlan: {
+        type: "string",
+        defaultValue: "anonymous",
+      },
+      subscriptionStatus: {
+        type: "string",
+        defaultValue: "none",
+      },
+      paypalSubscriptionId: {
+        type: "string",
+        required: false,
+      },
     },
   },
 });

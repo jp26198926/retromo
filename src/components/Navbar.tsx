@@ -49,6 +49,11 @@ export function Navbar() {
                   Teams
                 </Button>
               </Link>
+              <Link href="/billing">
+                <Button variant="ghost" size="md">
+                  Billing
+                </Button>
+              </Link>
               <Link href="/new-retrospective">
                 <Button size="md">New retro</Button>
               </Link>
@@ -117,6 +122,9 @@ export function Navbar() {
                 </Link>
                 <Link href="/teams" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-100">
                   Teams
+                </Link>
+                <Link href="/billing" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-100">
+                  Billing
                 </Link>
                 <Link href="/new-retrospective" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-base font-medium text-indigo-600 hover:bg-neutral-100">
                   New retro

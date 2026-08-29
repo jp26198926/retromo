@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@paypal/paypal-server-sdk": "^2.5.0",
+    "@paypal/react-paypal-js": "^10.4.0",
     "better-auth": "^1.7.2",
     "drizzle-orm": "^0.45.2",
     "next": "16.3.3",

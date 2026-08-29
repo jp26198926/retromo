@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { retros, columns, cards, votes, actionPoints, retroParticipants, votes as votesTable } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { retros, columns, cards, votes, actionPoints, retroParticipants } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import { getSession } from "@/lib/session";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   const session = await getSession();
+  const url = new URL(req.url);
+  const anonymousSessionId = url.searchParams.get("anon") || undefined;
 
   const retro = await db.query.retros.findFirst({ where: eq(retros.id, id) });
   if (!retro) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -44,17 +46,38 @@ export async function GET(
   }));
 
   // Determine current participant
-  const currentParticipant = session?.user
-    ? participants.find((p) => p.userId === session.user.id) || null
-    : null;
+  let currentParticipant = null;
+  if (session?.user) {
+    currentParticipant = participants.find((p) => p.userId === session.user.id) || null;
+  } else if (anonymousSessionId) {
+    currentParticipant =
+      participants.find((p) => p.anonymousSessionId === anonymousSessionId) || null;
+  }
+
+  // Filter private cards: only show private cards belonging to the current participant.
+  // Public cards are always visible. Private cards from other users are hidden.
+  const currentParticipantId = currentParticipant?.id || null;
+  const currentUserId = session?.user?.id || null;
+
+  const visibleCards = cardsWithVotes.filter((c) => {
+    if (c.isPublic) return true;
+    // Private card — only visible if it belongs to the current participant
+    if (currentParticipantId) {
+      // Match by authorId (logged-in) or by authorName matching displayName
+      // For anonymous users, cards are tagged with the participant's display name
+      if (c.authorId === currentUserId) return true;
+      if (!currentUserId && c.authorName && currentParticipant?.displayName === c.authorName) return true;
+    }
+    return false;
+  });
 
   return NextResponse.json({
     retro,
     columns: cols,
-    cards: cardsWithVotes,
+    cards: visibleCards,
     actionPoints: aps,
     participants,
-    currentUserId: session?.user?.id || null,
+    currentUserId,
     currentParticipant,
   });
 }

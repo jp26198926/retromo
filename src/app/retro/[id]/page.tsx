@@ -9,14 +9,18 @@ import { ActionPointsPanel } from "@/components/board/ActionPointsPanel";
 import { Button } from "@/components/Button";
 import { Logo } from "@/components/Logo";
 import { cn, timeAgo } from "@/lib/utils";
+import { useSession, signOut } from "@/lib/auth-client";
 
 export default function RetroBoardPage() {
   const params = useParams<{ id: string }>();
   const retroId = params.id;
-  const { state, loading, error, refresh } = useRetroBoard(retroId);
+  const { state, loading, error, refresh, updateName } = useRetroBoard(retroId);
+  const { data: sessionData } = useSession();
   const [showAP, setShowAP] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
 
   // Timer
   const [now, setNow] = useState(Date.now());
@@ -25,8 +29,6 @@ export default function RetroBoardPage() {
     return () => clearInterval(t);
   }, []);
 
-  // timer + retro are computed after the loading/error guards below
-
   function flash(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 2000);
@@ -34,10 +36,12 @@ export default function RetroBoardPage() {
 
   // --- Actions ---
   async function createCard(columnId: string, content: string) {
+    const participantId = state?.currentParticipant?.id || null;
+    const authorName = state?.currentParticipant?.displayName || null;
     await fetch("/api/cards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ columnId, retroId, content, isPublic: false }),
+      body: JSON.stringify({ columnId, retroId, content, isPublic: false, participantId, authorName }),
     });
     refresh();
   }
@@ -137,6 +141,24 @@ export default function RetroBoardPage() {
     refresh();
   }
 
+  // Name change for anonymous participants
+  function startEditName() {
+    setNameDraft(state?.currentParticipant?.displayName || "");
+    setEditingName(true);
+  }
+  async function saveName() {
+    if (nameDraft.trim()) {
+      await updateName(nameDraft.trim());
+    }
+    setEditingName(false);
+  }
+
+  // Logout
+  async function handleLogout() {
+    await signOut();
+    window.location.href = "/";
+  }
+
   function exportMarkdown() {
     if (!state) return;
     let md = `# ${state.retro.title}\n`;
@@ -148,7 +170,7 @@ export default function RetroBoardPage() {
         if (col.description) md += `_${col.description}_\n`;
         const publicCards = state.cards.filter((c) => c.columnId === col.id && c.isPublic);
         publicCards.forEach((c) => {
-          md += `- [${c.votesCount} votes] ${c.content}${c.authorName ? ` _(— ${c.authorName})_` : ""}\n`;
+          md += `- [${c.votesCount} votes] ${c.content}${c.authorName ? ` _(${c.authorName})_` : ""}\n`;
         });
         if (publicCards.length === 0) md += "_No public cards._\n";
       });
@@ -169,6 +191,7 @@ export default function RetroBoardPage() {
 
   const isFacilitator = state?.currentParticipant?.isFacilitator || false;
   const showAuthor = state?.retro?.engagement === "required_names";
+  const isLoggedIn = !!sessionData?.session && !!sessionData?.user;
   const sortedColumns = useMemo(
     () => [...(state?.columns ?? [])].sort((a, b) => a.position - b.position),
     [state?.columns]
@@ -206,8 +229,49 @@ export default function RetroBoardPage() {
           {retroData.topic && <p className="truncate text-xs text-neutral-500">{retroData.topic}</p>}
         </div>
 
+        {/* Current user identity badge / name editor */}
+        {state.currentParticipant && (
+          <div className="hidden items-center gap-2 sm:flex">
+            {editingName ? (
+              <div className="flex items-center gap-1">
+                <input
+                  autoFocus
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveName();
+                    if (e.key === "Escape") setEditingName(false);
+                  }}
+                  className="w-28 rounded border border-neutral-300 px-2 py-0.5 text-xs outline-none focus:border-indigo-500"
+                  placeholder="Your name"
+                />
+                <button onClick={saveName} className="rounded bg-indigo-600 px-2 py-0.5 text-xs text-white hover:bg-indigo-700">
+                  Save
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={startEditName}
+                className="flex items-center gap-1.5 rounded-full bg-neutral-100 px-2 py-1 text-xs hover:bg-neutral-200"
+                title="Click to change your name"
+              >
+                <span
+                  className="h-5 w-5 rounded-full text-center text-[9px] font-semibold leading-5 text-white"
+                  style={{ backgroundColor: state.currentParticipant.color || "#6366f1" }}
+                >
+                  {(state.currentParticipant.displayName || "?").charAt(0).toUpperCase()}
+                </span>
+                <span className="max-w-[100px] truncate text-neutral-700">
+                  {state.currentParticipant.displayName || "Anonymous"}
+                </span>
+                <span className="text-neutral-400">✎</span>
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Participants avatars */}
-        <div className="hidden items-center -space-x-2 sm:flex">
+        <div className="hidden items-center -space-x-2 md:flex">
           {state.participants.slice(0, 6).map((p) => (
             <div
               key={p.id}
@@ -243,7 +307,53 @@ export default function RetroBoardPage() {
           <span className="hidden sm:inline">Export</span>
           <span className="sm:hidden">⬇</span>
         </Button>
+
+        {/* Logout button for logged-in users */}
+        {isLoggedIn && (
+          <Button size="sm" variant="ghost" onClick={handleLogout} title="Log out">
+            <span className="hidden sm:inline">Log out</span>
+            <span className="sm:hidden">⏻</span>
+          </Button>
+        )}
       </header>
+
+      {/* Mobile name editor row */}
+      {state.currentParticipant && (
+        <div className="flex items-center gap-2 border-b border-neutral-200 bg-white px-3 py-1.5 sm:hidden">
+          {editingName ? (
+            <div className="flex flex-1 items-center gap-1">
+              <input
+                autoFocus
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveName();
+                  if (e.key === "Escape") setEditingName(false);
+                }}
+                className="flex-1 rounded border border-neutral-300 px-2 py-0.5 text-xs outline-none focus:border-indigo-500"
+                placeholder="Your name"
+              />
+              <button onClick={saveName} className="rounded bg-indigo-600 px-2 py-0.5 text-xs text-white">
+                Save
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={startEditName}
+              className="flex items-center gap-1.5 rounded-full bg-neutral-100 px-2 py-1 text-xs"
+            >
+              <span
+                className="h-5 w-5 rounded-full text-center text-[9px] font-semibold leading-5 text-white"
+                style={{ backgroundColor: state.currentParticipant.color || "#6366f1" }}
+              >
+                {(state.currentParticipant.displayName || "?").charAt(0).toUpperCase()}
+              </span>
+              <span className="truncate">{state.currentParticipant.displayName || "Anonymous"}</span>
+              <span className="text-neutral-400">✎</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Facilitator toolbar */}
       <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-neutral-200 bg-white px-3 py-1.5 sm:px-4">
@@ -282,29 +392,37 @@ export default function RetroBoardPage() {
         </div>
       </div>
 
-      {/* Board */}
-      <div className="board-scroll flex flex-1 gap-3 overflow-x-auto overflow-y-hidden p-3 sm:p-4">
-        {sortedColumns.map((col) => (
-          <Column
-            key={col.id}
-            column={col}
-            cards={state.cards.filter((c) => c.columnId === col.id)}
-            currentUserId={state.currentUserId}
-            currentParticipantId={state.currentParticipant?.id || null}
-            currentParticipantName={state.currentParticipant?.displayName || null}
-            secretVoting={retroData.secretVoting}
-            showAuthor={showAuthor}
-            locked={retroData.locked}
-            onCreateCard={createCard}
-            onVote={vote}
-            onDeleteCard={deleteCard}
-            onTogglePublic={togglePublic}
-            onColorChange={colorChange}
-            onDropCard={dropCard}
-            draggedId={draggedId}
-            setDraggedId={setDraggedId}
-          />
-        ))}
+      {/* Board — full viewport width, columns side by side using grid */}
+      <div className="board-scroll flex-1 overflow-auto p-3 sm:p-4">
+        <div
+          className="grid gap-4"
+          style={{
+            gridTemplateColumns: `repeat(${sortedColumns.length}, minmax(280px, 1fr))`,
+          }}
+        >
+          {sortedColumns.map((col) => (
+            <Column
+              key={col.id}
+              column={col}
+              cards={state.cards.filter((c) => c.columnId === col.id)}
+              currentUserId={state.currentUserId}
+              currentParticipantId={state.currentParticipant?.id || null}
+              currentParticipantName={state.currentParticipant?.displayName || null}
+              currentParticipantColor={state.currentParticipant?.color || null}
+              secretVoting={retroData.secretVoting}
+              showAuthor={showAuthor}
+              locked={retroData.locked}
+              onCreateCard={createCard}
+              onVote={vote}
+              onDeleteCard={deleteCard}
+              onTogglePublic={togglePublic}
+              onColorChange={colorChange}
+              onDropCard={dropCard}
+              draggedId={draggedId}
+              setDraggedId={setDraggedId}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Action points slide-over */}

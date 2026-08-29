@@ -23,6 +23,7 @@ interface CardProps {
   card: CardData;
   currentUserId: string | null;
   currentParticipantId: string | null;
+  currentParticipantColor?: string | null;
   secretVoting: boolean;
   showAuthor: boolean;
   isMine: boolean;
@@ -55,16 +56,31 @@ export function Card({
     (v) => v.voterId === currentUserId || (v.voterName && v.voterName === currentUserId)
   );
 
+  // Post-it rotation: deterministic slight rotation based on card id
+  const rotation = ((card.id.charCodeAt(0) + card.id.charCodeAt(1)) % 5) - 2; // -2 to 2 degrees
+
   return (
     <div
       draggable={isMine || isPublicSection}
       onDragStart={(e) => onDragStart(e, card.id)}
       className={cn(
-        "postit group relative rounded-lg border p-3 text-sm leading-snug animate-fade-in",
+        "postit group relative rounded-sm p-3 pt-5 text-sm leading-snug animate-fade-in transition-shadow",
+        "shadow-[0_1px_3px_rgba(0,0,0,0.15),0_4px_10px_rgba(0,0,0,0.08)] hover:shadow-[0_2px_6px_rgba(0,0,0,0.2),0_8px_20px_rgba(0,0,0,0.12)]",
         draggedId === card.id && "opacity-40"
       )}
-      style={{ backgroundColor: colors.bg, borderColor: colors.border }}
+      style={{
+        backgroundColor: colors.bg,
+        borderTopColor: colors.border,
+        borderTopWidth: "3px",
+        transform: `rotate(${rotation}deg)`,
+      }}
     >
+      {/* Tape effect on top */}
+      <div
+        className="absolute -top-2 left-1/2 h-4 w-12 -translate-x-1/2 rounded-sm bg-neutral-400/30 shadow-sm"
+        aria-hidden
+      />
+
       {/* Image */}
       {card.imageUrl && (
         <img src={card.imageUrl} alt="" className="mb-2 max-h-40 w-full rounded object-cover" />
@@ -75,8 +91,9 @@ export function Card({
       {/* Footer: author + votes */}
       <div className="mt-2 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          {showAuthor && card.authorName && (
-            <span className="text-xs text-neutral-500">— {card.authorName}</span>
+          {/* Always show author name if available — it auto-appears on cards the user posts */}
+          {card.authorName && (
+            <span className="text-xs italic text-neutral-500">— {card.authorName}</span>
           )}
         </div>
         {/* Vote button */}

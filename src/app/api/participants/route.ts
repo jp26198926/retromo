@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { retroParticipants } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getSession } from "@/lib/session";
 import { randomColor, randomDisplayName } from "@/lib/utils";
 
@@ -10,15 +10,12 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const session = await getSession();
-    const { retroId, displayName, isFacilitator = false } = body;
+    const { retroId, displayName, isFacilitator = false, anonymousSessionId } = body;
 
     if (!retroId) return NextResponse.json({ error: "retroId required" }, { status: 400 });
 
     // If logged in, find existing by userId
     if (session?.user) {
-      const existing = await db.query.retroParticipants.findFirst({
-        where: eq(retroParticipants.retroId, retroId),
-      });
       const mine = await db.query.retroParticipants.findMany({
         where: eq(retroParticipants.retroId, retroId),
       });
@@ -36,16 +33,28 @@ export async function POST(req: NextRequest) {
           isFacilitator,
         })
         .returning();
-      void existing;
       return NextResponse.json(p);
     }
 
-    // Anonymous guest
+    // Anonymous guest — dedup by anonymousSessionId so same browser session
+    // always gets the same participant (and same private space)
+    if (anonymousSessionId) {
+      const existing = await db.query.retroParticipants.findFirst({
+        where: and(
+          eq(retroParticipants.retroId, retroId),
+          eq(retroParticipants.anonymousSessionId, anonymousSessionId)
+        ),
+      });
+      if (existing) return NextResponse.json(existing);
+    }
+
+    // Create new anonymous participant
     const [p] = await db
       .insert(retroParticipants)
       .values({
         id: crypto.randomUUID(),
         retroId,
+        anonymousSessionId: anonymousSessionId || null,
         displayName: displayName || randomDisplayName(),
         color: randomColor(),
         isFacilitator: false,

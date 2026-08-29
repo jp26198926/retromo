@@ -19,6 +19,7 @@ interface ColumnProps {
   currentUserId: string | null;
   currentParticipantId: string | null;
   currentParticipantName: string | null;
+  currentParticipantColor: string | null;
   secretVoting: boolean;
   showAuthor: boolean;
   locked: boolean;
@@ -38,6 +39,8 @@ export function Column(props: ColumnProps) {
     cards,
     currentUserId,
     currentParticipantId,
+    currentParticipantName,
+    currentParticipantColor,
     secretVoting,
     showAuthor,
     locked,
@@ -56,7 +59,17 @@ export function Column(props: ColumnProps) {
   const [dragOverPrivate, setDragOverPrivate] = useState(false);
 
   const publicCards = cards.filter((c) => c.isPublic).sort((a, b) => b.votesCount - a.votesCount || a.position - b.position);
-  const myPrivateCards = cards.filter((c) => !c.isPublic && (c.authorId === currentUserId || (!currentUserId && c.authorName === null)));
+
+  // Private cards that belong to the current participant
+  // For logged-in users, match by authorId
+  // For anonymous users, match by authorName === currentParticipantName
+  const myPrivateCards = cards
+    .filter((c) => !c.isPublic)
+    .filter((c) => {
+      if (currentUserId) return c.authorId === currentUserId;
+      // anonymous: match by display name (which is stored on the card when created)
+      return c.authorName != null && c.authorName === currentParticipantName;
+    });
 
   function handleAdd() {
     if (!draft.trim() || locked) return;
@@ -74,7 +87,7 @@ export function Column(props: ColumnProps) {
   }
 
   return (
-    <div className="flex w-72 flex-shrink-0 flex-col rounded-xl border border-neutral-200 bg-neutral-50/60 sm:w-80">
+    <div className="flex flex-col rounded-xl border border-neutral-200 bg-neutral-50/60">
       {/* Header */}
       <div
         className="rounded-t-xl border-b-2 px-4 py-3"
@@ -90,7 +103,7 @@ export function Column(props: ColumnProps) {
 
       {/* Public section */}
       <div
-        className={cn("flex flex-col gap-2 p-3 min-h-[120px]", dragOverPublic && "drag-over")}
+        className={cn("flex flex-col gap-3 p-4 min-h-[120px]", dragOverPublic && "drag-over")}
         onDragOver={(e) => { e.preventDefault(); setDragOverPublic(true); }}
         onDragLeave={() => setDragOverPublic(false)}
         onDrop={(e) => handleDrop(e, true)}
@@ -103,29 +116,32 @@ export function Column(props: ColumnProps) {
             Drag cards here to share
           </div>
         )}
-        {publicCards.map((card) => (
-          <Card
-            key={card.id}
-            card={card}
-            currentUserId={currentUserId}
-            currentParticipantId={currentParticipantId}
-            secretVoting={secretVoting}
-            showAuthor={showAuthor}
-            isMine={card.authorId === currentUserId}
-            isPublicSection={true}
-            onVote={onVote}
-            onDelete={onDeleteCard}
-            onTogglePublic={onTogglePublic}
-            onColorChange={onColorChange}
-            onDragStart={(e) => { e.dataTransfer.setData("text/plain", card.id); setDraggedId(card.id); }}
-            draggedId={draggedId}
-          />
-        ))}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {publicCards.map((card) => (
+            <Card
+              key={card.id}
+              card={card}
+              currentUserId={currentUserId}
+              currentParticipantId={currentParticipantId}
+              currentParticipantColor={currentParticipantColor}
+              secretVoting={secretVoting}
+              showAuthor={showAuthor}
+              isMine={card.authorId === currentUserId || (!currentUserId && card.authorName === currentParticipantName)}
+              isPublicSection={true}
+              onVote={onVote}
+              onDelete={onDeleteCard}
+              onTogglePublic={onTogglePublic}
+              onColorChange={onColorChange}
+              onDragStart={(e) => { e.dataTransfer.setData("text/plain", card.id); setDraggedId(card.id); }}
+              draggedId={draggedId}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Private section (only visible to current user) */}
       <div
-        className={cn("flex flex-col gap-2 border-t border-dashed border-neutral-200 p-3 min-h-[120px]", dragOverPrivate && "drag-over")}
+        className={cn("flex flex-col gap-3 border-t border-dashed border-neutral-200 p-4 min-h-[120px]", dragOverPrivate && "drag-over")}
         onDragOver={(e) => { e.preventDefault(); setDragOverPrivate(true); }}
         onDragLeave={() => setDragOverPrivate(false)}
         onDrop={(e) => handleDrop(e, false)}
@@ -133,24 +149,27 @@ export function Column(props: ColumnProps) {
         <div className="flex items-center justify-between px-1">
           <span className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Your private space</span>
         </div>
-        {myPrivateCards.map((card) => (
-          <Card
-            key={card.id}
-            card={card}
-            currentUserId={currentUserId}
-            currentParticipantId={currentParticipantId}
-            secretVoting={secretVoting}
-            showAuthor={showAuthor}
-            isMine={true}
-            isPublicSection={false}
-            onVote={onVote}
-            onDelete={onDeleteCard}
-            onTogglePublic={onTogglePublic}
-            onColorChange={onColorChange}
-            onDragStart={(e) => { e.dataTransfer.setData("text/plain", card.id); setDraggedId(card.id); }}
-            draggedId={draggedId}
-          />
-        ))}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {myPrivateCards.map((card) => (
+            <Card
+              key={card.id}
+              card={card}
+              currentUserId={currentUserId}
+              currentParticipantId={currentParticipantId}
+              currentParticipantColor={currentParticipantColor}
+              secretVoting={secretVoting}
+              showAuthor={showAuthor}
+              isMine={true}
+              isPublicSection={false}
+              onVote={onVote}
+              onDelete={onDeleteCard}
+              onTogglePublic={onTogglePublic}
+              onColorChange={onColorChange}
+              onDragStart={(e) => { e.dataTransfer.setData("text/plain", card.id); setDraggedId(card.id); }}
+              draggedId={draggedId}
+            />
+          ))}
+        </div>
         {!locked && (
           <div className="mt-1">
             <textarea
