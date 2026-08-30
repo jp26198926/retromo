@@ -86,6 +86,26 @@ This is enforced server-side on every entry point, each returning `401` with `re
 
 The board page detects that response and shows a _"This retrospective is private"_ screen with sign-in / sign-up buttons that return the visitor to the board after authenticating, rather than a raw error. The shared logic lives in `src/lib/retro-access.ts`.
 
+### User Profile (`/profile`)
+
+Every signed-in user gets a self-service profile page, reachable from the avatar button in the desktop navbar or the **Profile** entry in the mobile menu. Visiting it while logged out shows a sign-in prompt that returns to `/profile` after authenticating.
+
+The page is organised into four parts:
+
+- **Account summary** — avatar (or generated initials), display name, email, an `Admin` badge when applicable, the current plan badge, the member-since date, and activity counters for retros created, retros joined, and teams.
+- **Personal information** — edit the display name and the avatar image URL. Email is shown read-only because changing it would invalidate the sign-in identity.
+- **Password** — change the password by supplying the current one, the new one (minimum 8 characters, matching the sign-up rule), and a confirmation. A live strength meter, a show/hide toggle, and an optional _"sign out other devices"_ checkbox are included. Users who registered exclusively through Google or GitHub have no password on file, so this section is replaced by a short note naming their sign-in provider.
+- **Subscription** — a shortcut to `/billing` for plan changes and invoices.
+
+Password changes go through better-auth's `/change-password` endpoint (via `changePassword` in `src/lib/auth-client.ts`), which verifies the current password server-side and honours `revokeOtherSessions`. Profile edits go through the app's own API:
+
+| Endpoint             | Purpose                                                                                                                            |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/profile`   | Returns the profile, auth metadata (`hasPassword`, linked `providers`), effective plan, admin flag, and activity stats              |
+| `PATCH /api/profile` | Updates `name` (2–60 characters) and `image` (must be a valid `http`/`https` URL); rejects invalid input with `400`                 |
+
+Both methods return `401` when there is no session, and the server only ever writes to the currently authenticated user's row — the user id is taken from the session, never from the request body.
+
 ### Plans & Billing
 
 Three subscription tiers with plan-based feature gating. Payments are processed via PayPal (sandbox or production). The admin can configure pricing and the anonymous participant limit.
@@ -303,6 +323,7 @@ src/
 │   │   ├── teams/                # Team CRUD + members + invite
 │   │   ├── admin/                # Admin: check, settings, upload, users, reports, billing
 │   │   ├── paypal/               # PayPal create-order + capture-order
+│   │   ├── profile/             # Current user's profile (GET + PATCH)
 │   │   ├── subscription/         # Subscription status + cancel
 │   │   ├── app-settings/         # Public app settings (name, logo, prices)
 │   │   └── contact/              # Contact form submission
@@ -312,6 +333,7 @@ src/
 │   ├── faq/                      # FAQ page
 │   ├── sign-in/                  # Sign in page
 │   ├── sign-up/                  # Sign up page
+│   ├── profile/                 # User profile (update info, change password)
 │   ├── billing/                  # Billing & subscription management
 │   ├── dashboard/                # User dashboard (retros + teams)
 │   ├── teams/                    # Teams list + detail + invite accept
@@ -343,7 +365,7 @@ src/
 │   └── seed.ts                   # Template seeder
 └── lib/
     ├── auth.ts                   # better-auth server config
-    ├── auth-client.ts            # better-auth React client
+    ├── auth-client.ts            # better-auth React client (+ updateUser, changePassword)
     ├── session.ts                # Server-side session helper
     ├── admin.ts                  # Admin session helper
     ├── plans.ts                  # Plan feature flags + current user plan

@@ -23,6 +23,16 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
 
   const loggedIn = !isPending && !!session;
+  const userName = session?.user?.name?.trim() || session?.user?.email || "";
+  const userImage = session?.user?.image || "";
+  const initials =
+    userName
+      .replace(/@.*$/, "")
+      .split(/[\s._-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "U";
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-neutral-200 bg-white/80 backdrop-blur">
@@ -85,6 +95,20 @@ export function Navbar() {
               </Link>
               <Link href="/new-retrospective">
                 <Button size="md">New retro</Button>
+              </Link>
+              {/* Profile shortcut (avatar) */}
+              <Link
+                href="/profile"
+                title={`Profile — ${userName}`}
+                aria-label="Profile"
+                className="ml-1 inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-neutral-200 bg-neutral-100 text-xs font-semibold text-neutral-700 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
+              >
+                {userImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={userImage} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  initials
+                )}
               </Link>
               <button
                 onClick={() => signOut({ fetchOptions: { onSuccess: () => { window.location.href = "/"; } } })}
@@ -177,6 +201,9 @@ export function Navbar() {
                 </Link>
                 <Link href="/billing" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-100">
                   Billing
+                </Link>
+                <Link href="/profile" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-base font-medium text-neutral-700 hover:bg-neutral-100">
+                  Profile
                 </Link>
                 <Link href="/new-retrospective" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-base font-medium text-indigo-600 hover:bg-neutral-100">
                   New retro
