@@ -54,11 +54,15 @@ export function UpgradePlanModal({ open, currentPlan, onCancel, onSuccess }: Upg
       price: loaded ? `$${settings.individualPrice}` : "$10",
       amount: settings.individualPrice,
       features: [
+        "Unlimited cards per retrospective",
+        "Data export to Markdown",
+        "Private, invite-only retrospectives",
+        "Card moderation (approve / reject)",
         "Advanced facilitation tools",
         "Extended retro customization",
         "Manage up to 3 teams",
-        "Infinite retrospective archive",
-        "Private, invite-only retrospectives",
+        "Infinite archive — archive & restore retros",
+        "Configurable data retention",
         "High priority support",
       ],
     },
@@ -71,8 +75,8 @@ export function UpgradePlanModal({ open, currentPlan, onCancel, onSuccess }: Upg
       features: [
         "Everything from Individual, and:",
         "Unlimited teams in your company",
-        "Assign teams to Scrum Masters",
-        "Zero-knowledge encryption",
+        "Assign teams to Scrum Masters & Team Leads",
+        "Zero-knowledge encryption with custom passwords",
         "Top priority support",
       ],
     },
@@ -182,7 +186,7 @@ export function UpgradePlanModal({ open, currentPlan, onCancel, onSuccess }: Upg
                       <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
-                      <span>{f}</span>
+                      <span className={i === 0 && f.startsWith("Everything from") ? "font-semibold text-neutral-900" : ""}>{f}</span>
                     </li>
                   ))}
                 </ul>
