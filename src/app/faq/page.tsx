@@ -11,8 +11,9 @@ const faqs = [
   { q: "How does the private section work?", a: "Each participant has their own Private Section in every column where only they can see what they wrote. They decide what to drag to the Public Section above for everyone to see." },
   { q: "Can I limit voting?", a: "Yes. You can limit how many votes a participant has for the whole retro, in a single column, and on a single card. Secret voting hides results until you disable it." },
   { q: "What are action points?", a: "Action items are the most important product of a retrospective. Create them in the action points panel, assign a responsible teammate, and set a due date to help finish them." },
-  { q: "What's the difference between plans?", a: "Anonymous is free forever with core features. Individual ($10/team/mo) adds advanced facilitation, customization, teams, archives, and private retros. Company ($20/team/mo) adds unlimited teams, team assignment, and zero-knowledge encryption." },
-  { q: "Can I export my data?", a: "Yes. All plans support data export to Markdown." },
+  { q: "What's the difference between plans?", a: "Anonymous is free forever with core features, but is capped at 3 cards per retro and has no Markdown export. Personal ($10/team/mo) adds unlimited cards, Markdown export, private retros, card moderation, advanced facilitation, customization, up to 3 teams, archiving, and configurable data retention. Company ($20/team/mo) adds unlimited teams, Scrum Master and Team Lead role assignment, and zero-knowledge encryption with custom passwords." },
+  { q: "Is there a limit on the free plan?", a: "Anonymous (free) retros are limited to 3 cards per retrospective, with unlimited columns and action points. Upgrade to Personal or Company for unlimited cards." },
+  { q: "Can I export my data?", a: "Data export to Markdown is available on the Personal and Company plans. The free Anonymous plan does not include export." },
   { q: "Is my data secure?", a: "Paid plans offer regular, private invite-only, and encrypted ad-hoc retrospectives for top-tier security, including zero-knowledge encryption with custom passwords on the Company plan." },
 ];
 

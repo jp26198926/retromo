@@ -30,6 +30,7 @@ A full-featured retrospective application inspired by [retrotool.io](https://ret
 - Set a countdown timer (0, 1, 3, 5, 10, 15 minutes) with auto-lock when expired
 - Copy share link to invite participants
 - Ready check for participants
+- **Card moderation panel** (paid plans) — a floating panel with a pending-count badge lets facilitators approve or reject cards before they become visible to the rest of the team
 
 ### Real-time Collaboration
 - Live updates via polling (cards, votes, participants, action points sync automatically)
@@ -41,7 +42,7 @@ A full-featured retrospective application inspired by [retrotool.io](https://ret
 - Invite members by email (with optional SMTP email invitations and accept-token flow)
 - Group retrospectives under a team
 - View team-wide action point overview (open vs. done)
-- Owner and member roles (member management restricted to team owner)
+- Roles: `owner`, `member`, plus **`scrumMaster`** and **`teamLead`** (Company plan only) — the team owner can change any member's role from the team detail page
 
 ### Authentication
 - Email & password sign up / sign in (powered by [better-auth](https://better-auth.com))
@@ -53,36 +54,53 @@ Three subscription tiers with plan-based feature gating. Payments are processed 
 
 #### Anonymous (Free)
 - No account needed — start a retro instantly
-- Retros retained for up to 12 months (365 days)
-- Unlimited cards, columns, and action points
+- **Up to 3 cards per retrospective** (enforced server-side; further cards return `403`)
+- Unlimited columns and action points
 - Configurable participant limit (admin-set, default 50)
 - Basic facilitation tools (lock, secret voting, timer)
-- Data export to Markdown
+- Retros retained for 12 months (365 days, fixed — not configurable)
+- ❌ No Markdown export (paid plans only)
+- ❌ No private retros, moderation, archiving, or encryption
 
 #### Individual ($10/mo, admin-configurable)
 Everything from Anonymous, plus:
-- **Advanced facilitation tools** — facilitator-only moderation, read-only lock mode
+- **Unlimited cards per retrospective** — the 3-card free cap is lifted
+- **Data export to Markdown** — export button appears on the board
+- **Private, invite-only retrospectives** — restrict access to invited participants
+- **Card moderation** — cards start as *pending* and require facilitator approval before appearing publicly
+- **Advanced facilitation tools** — secret voting, countdown timer, read-only lock mode
 - **Extended retro customization** — custom columns, image filters (blur, translucent)
 - **Manage up to 3 teams**
-- **Infinite retrospective archive** — retros never auto-expire
-- **Configurable data retention times**
-- **Private, invite-only retrospectives** — restrict access to invited participants
+- **Infinite retrospective archive** — archive and restore retros; they never auto-expire
+- **Configurable data retention** — choose forever, 30, 90, 180, or 365 days
 - **High priority support**
 - Unlimited participants
 
 #### Company ($20/mo, admin-configurable)
 Everything from Individual, plus:
 - **Manage unlimited teams** in your company
-- **Assign any number of teams to Scrum Masters and Team Leads** *(see note below)*
-- **Zero-knowledge encryption with custom passwords** *(see note below)*
+- **Assign any number of teams to Scrum Masters and Team Leads** — dedicated `scrumMaster` and `teamLead` roles
+- **Zero-knowledge encryption with custom passwords** — card content is encrypted in the browser with AES-256-GCM; the password is never sent to the server
 - **Top priority support**
 
-> **Feature implementation note:** The feature flags for zero-knowledge encryption (`zeroKnowledgeEncryption`) and configurable retention (`configurableRetention`) are defined in `src/lib/plans.ts` and gated by plan. The database schema includes `retentionDays` on the `retro` table (365 for anonymous, null/infinite for paid). The moderation flag (`moderated`) is enforced on the backend for paid plans. However, the following advertised features have backend scaffolding but **no user-facing UI yet**:
-> - **Zero-knowledge encryption**: The `zeroKnowledgeEncryption` flag is set to `true` for the Company plan in `plans.ts`, but there is no encryption/decryption logic or password-protected retro creation UI implemented yet.
-> - **Configurable data retention UI**: The `retentionDays` field exists in the schema and is auto-set (365 for anonymous, null for paid), but there is no UI for users to configure custom retention periods.
-> - **Assign teams to Scrum Masters / Team Leads**: Teams can be created and members invited, but there is no "assign team to a scrum master" workflow — the team member role is simply `owner` or `member`.
-> - **Moderation UI**: The `moderated` flag is stored and enforced (paid-only), and the board state includes it, but there is no card-approval/rejection moderation interface in the board UI yet.
-> - **Archive/unarchive action**: The `archived` field exists and is displayed as a badge in retro history, but there is no archive/unarchive button in the UI.
+#### Plan comparison
+
+| Feature | Anonymous | Individual | Company |
+| --- | :---: | :---: | :---: |
+| Cards per retro | 3 | Unlimited | Unlimited |
+| Columns & action points | Unlimited | Unlimited | Unlimited |
+| Participants per retro | 50 (admin-set) | Unlimited | Unlimited |
+| Basic facilitation (lock, timer, secret voting) | ✅ | ✅ | ✅ |
+| Markdown export | ❌ | ✅ | ✅ |
+| Private, invite-only retros | ❌ | ✅ | ✅ |
+| Card moderation (approve / reject) | ❌ | ✅ | ✅ |
+| Extended customization | ❌ | ✅ | ✅ |
+| Archive / unarchive retros | ❌ | ✅ | ✅ |
+| Data retention | 365 days (fixed) | Configurable | Configurable |
+| Teams | 0 | 3 | Unlimited |
+| Scrum Master / Team Lead roles | ❌ | ❌ | ✅ |
+| Zero-knowledge encryption | ❌ | ❌ | ✅ |
+| Support priority | — | High | Top |
 
 ### Admin Panel (`/admin`)
 - Dashboard with platform-wide reports (user count, retro count, active retros, team count, MRR estimates)
@@ -300,12 +318,12 @@ The schema includes these tables:
 - **user** — better-auth user with subscription fields (plan, status, PayPal ID, period end, cancelled at)
 - **session**, **account**, **verification** — better-auth tables
 - **team** — team with name, color, owner
-- **team_member** — team membership (owner or member role)
+- **team_member** — team membership (`owner`, `member`, `scrumMaster`, or `teamLead` role)
 - **team_invitation** — email invitations with accept token
-- **retro** — retrospective with voting config, timer, facilitation flags, visibility, plan, retention, share token
+- **retro** — retrospective with voting config, timer, facilitation flags, visibility, plan, `retentionDays`, `archived`, `encryptionEnabled`, share token
 - **retro_participant** — participants with display name, color, facilitator flag, anonymous session ID
 - **column** — board columns with color, image URL, image filter, position
-- **card** — post-it cards with color, public/private flag, vote count, author, image URL
+- **card** — post-it cards with color, public/private flag, `approved` (moderation) flag, vote count, author, image URL
 - **vote** — individual votes
 - **action_point** — action items with assignee, due date, status
 - **template** — built-in and custom templates
@@ -316,19 +334,44 @@ The schema includes these tables:
 
 Feature access is controlled by `src/lib/plans.ts`, which defines feature flags per plan:
 
-| Feature | Anonymous | Individual | Company |
+| Feature flag | Anonymous | Individual | Company |
 |---|---|---|---|
-| Max teams | 0 | 3 | Unlimited |
-| Participant limit | Admin-configurable (default 50) | Unlimited | Unlimited |
-| Private retrospectives | — | ✅ | ✅ |
-| Advanced facilitation (moderation) | — | ✅ | ✅ |
-| Extended customization | — | ✅ | ✅ |
-| Infinite archive | — | ✅ | ✅ |
-| Configurable retention | — | ✅ | ✅ |
-| Zero-knowledge encryption | — | — | ✅ |
-| Priority support | — | High | Top |
+| `maxTeams` | 0 | 3 | Unlimited (`-1`) |
+| `participantLimit` | Admin-configurable (default 50) | Unlimited | Unlimited |
+| `privateRetros` | — | ✅ | ✅ |
+| `advancedFacilitation` (moderation) | — | ✅ | ✅ |
+| `extendedCustomization` | — | ✅ | ✅ |
+| `infiniteArchive` | — | ✅ | ✅ |
+| `configurableRetention` | — | ✅ | ✅ |
+| `zeroKnowledgeEncryption` | — | — | ✅ |
+| `prioritySupport` | `none` | `high` | `top` |
 
 The `getCurrentUserPlan()` function reads the user's subscription from the database and returns the active feature set. `hasActiveAccess()` handles cancelled subscriptions that are still within their paid period.
+
+### Where gating is enforced
+
+Gating is applied on the **server** (authoritative) and mirrored in the **UI** (for a good experience):
+
+| Restriction | Server enforcement | UI behaviour |
+|---|---|---|
+| 3-card cap on free plan | `POST /api/cards` counts existing cards and returns `403` for `anonymous` retros at 3 | Error toast: *"The free plan is limited to 3 cards per retrospective. Upgrade to add more."* |
+| Markdown export | — | Export button hidden unless `retro.plan !== "anonymous"` |
+| Private retros | `POST /api/retros` rejects `visibility: "private"` without `privateRetros` | Toggle disabled with an upgrade hint |
+| Moderation | `POST /api/cards/moderation` verifies the retro is moderated and the caller is owner/facilitator/admin | Moderation panel only rendered for facilitators on moderated retros |
+| Configurable retention | `POST /api/retros` forces 365 days for anonymous; validates 1–3650 (or 0/-1 = forever) for paid | Dropdown disabled with *"Upgrade to configure"* |
+| Archive / unarchive | `PATCH /api/retros/[id]` requires ownership and a paid plan | Archive button only shown to owners of paid retros |
+| Scrum Master / Team Lead | `PATCH /api/teams/[id]/members` requires the Company plan for those roles | Role options disabled for non-Company plans |
+| Zero-knowledge encryption | `POST /api/retros` rejects `encryptionEnabled` without the Company plan | Toggle + password fields only enabled on Company plan |
+
+### Zero-knowledge encryption
+
+Implemented in `src/lib/crypto.ts` using the Web Crypto API:
+
+- **AES-256-GCM** for content encryption, with a **PBKDF2** key derivation (150,000 iterations, SHA-256)
+- A random salt and IV are generated per card and packed with the ciphertext into a single base64 string
+- Encryption and decryption happen **entirely in the browser** — the password is never transmitted, and the server only ever stores ciphertext
+- The password is held in `sessionStorage` for the duration of the session so the board can transparently decrypt cards
+- Because the server cannot recover the password, **a lost password means permanently unreadable cards**
 
 ## License
 
