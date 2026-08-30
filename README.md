@@ -1,10 +1,11 @@
 # RetroMo
 
-A full-featured retrospective application inspired by [retrotool.io](https://retrotool.io). Run agile retrospectives with your team using post-it style cards, dot voting, action points, timers, and facilitator controls — all in real-time. Includes a subscription/billing system with PayPal, team management, an admin panel, and Cloudinary-powered asset uploads.
+A full-featured retrospective application. Run agile retrospectives with your team using post-it style cards, dot voting, action points, timers, and facilitator controls — all in real-time. Includes a subscription/billing system with PayPal, team management, an admin panel, and Cloudinary-powered asset uploads.
 
 ## Features
 
 ### Core Retrospective Board
+
 - **Templates**: Mad/Sad/Glad, Liked/Learned/Lacked, Start/Stop/Continue, or blank slate
 - **Custom columns**: Add, remove, reorder, rename, and color-code columns during retro setup
 - **Post-it cards**: Colorful sticky notes with text, emoji, and image support (paste or upload)
@@ -14,17 +15,20 @@ A full-featured retrospective application inspired by [retrotool.io](https://ret
 - **Data export**: Export the entire board (columns, cards, votes, action points) to Markdown
 
 ### Dot Voting
+
 - Configurable votes per participant, per column, and per card
 - Secret voting mode (results hidden until facilitator reveals) or public voting — toggleable live
 - Real-time vote counts with sort-by-votes
 
 ### Action Points
+
 - Capture actionable items directly from the retrospective
 - Assign owners and due dates
 - Track status (open / done)
 - Team-level action point overview
 
 ### Facilitator Tools
+
 - Lock the board (read-only mode)
 - Toggle secret voting on/off
 - Set a countdown timer (0, 1, 3, 5, 10, 15 minutes) with auto-lock when expired
@@ -33,11 +37,13 @@ A full-featured retrospective application inspired by [retrotool.io](https://ret
 - **Card moderation panel** (paid plans) — a floating panel with a pending-count badge lets facilitators approve or reject cards before they become visible to the rest of the team
 
 ### Real-time Collaboration
+
 - Live updates via polling (cards, votes, participants, action points sync automatically)
 - Participant list with avatars and colors
 - Retro history dashboard with search, filtering (by plan, team, role), sorting, and pagination
 
 ### Teams
+
 - Create teams with custom names and colors (plan-limited: Anonymous = 0, Individual = 3, Company = unlimited)
 - Invite members by email (with optional SMTP email invitations and accept-token flow)
 - Group retrospectives under a team
@@ -45,14 +51,17 @@ A full-featured retrospective application inspired by [retrotool.io](https://ret
 - Roles: `owner`, `member`, plus **`scrumMaster`** and **`teamLead`** (Company plan only) — the team owner can change any member's role from the team detail page
 
 ### Authentication
+
 - Email & password sign up / sign in (powered by [better-auth](https://better-auth.com))
 - Optional Google and GitHub OAuth social login (auto-hidden if not configured)
 - Anonymous guest participation (no account required for free retros)
 
 ### Plans & Billing
+
 Three subscription tiers with plan-based feature gating. Payments are processed via PayPal (sandbox or production). The admin can configure pricing and the anonymous participant limit.
 
 #### Anonymous (Free)
+
 - No account needed — start a retro instantly
 - **Up to 3 cards per retrospective** (enforced server-side; further cards return `403`)
 - Unlimited columns and action points
@@ -63,11 +72,13 @@ Three subscription tiers with plan-based feature gating. Payments are processed 
 - ❌ No private retros, moderation, archiving, or encryption
 
 #### Individual ($10/mo, admin-configurable)
+
 Everything from Anonymous, plus:
+
 - **Unlimited cards per retrospective** — the 3-card free cap is lifted
 - **Data export to Markdown** — export button appears on the board
 - **Private, invite-only retrospectives** — restrict access to invited participants
-- **Card moderation** — cards start as *pending* and require facilitator approval before appearing publicly
+- **Card moderation** — cards start as _pending_ and require facilitator approval before appearing publicly
 - **Advanced facilitation tools** — secret voting, countdown timer, read-only lock mode
 - **Extended retro customization** — custom columns, image filters (blur, translucent)
 - **Manage up to 3 teams**
@@ -77,7 +88,9 @@ Everything from Anonymous, plus:
 - Unlimited participants
 
 #### Company ($20/mo, admin-configurable)
+
 Everything from Individual, plus:
+
 - **Manage unlimited teams** in your company
 - **Assign any number of teams to Scrum Masters and Team Leads** — dedicated `scrumMaster` and `teamLead` roles
 - **Zero-knowledge encryption with custom passwords** — card content is encrypted in the browser with AES-256-GCM; the password is never sent to the server
@@ -85,24 +98,25 @@ Everything from Individual, plus:
 
 #### Plan comparison
 
-| Feature | Anonymous | Individual | Company |
-| --- | :---: | :---: | :---: |
-| Cards per retro | 3 | Unlimited | Unlimited |
-| Columns & action points | Unlimited | Unlimited | Unlimited |
-| Participants per retro | 50 (admin-set) | Unlimited | Unlimited |
-| Basic facilitation (lock, timer, secret voting) | ✅ | ✅ | ✅ |
-| Markdown export | ❌ | ✅ | ✅ |
-| Private, invite-only retros | ❌ | ✅ | ✅ |
-| Card moderation (approve / reject) | ❌ | ✅ | ✅ |
-| Extended customization | ❌ | ✅ | ✅ |
-| Archive / unarchive retros | ❌ | ✅ | ✅ |
-| Data retention | 365 days (fixed) | Configurable | Configurable |
-| Teams | 0 | 3 | Unlimited |
-| Scrum Master / Team Lead roles | ❌ | ❌ | ✅ |
-| Zero-knowledge encryption | ❌ | ❌ | ✅ |
-| Support priority | — | High | Top |
+| Feature                                         |    Anonymous     |  Individual  |   Company    |
+| ----------------------------------------------- | :--------------: | :----------: | :----------: |
+| Cards per retro                                 |        3         |  Unlimited   |  Unlimited   |
+| Columns & action points                         |    Unlimited     |  Unlimited   |  Unlimited   |
+| Participants per retro                          |  50 (admin-set)  |  Unlimited   |  Unlimited   |
+| Basic facilitation (lock, timer, secret voting) |        ✅        |      ✅      |      ✅      |
+| Markdown export                                 |        ❌        |      ✅      |      ✅      |
+| Private, invite-only retros                     |        ❌        |      ✅      |      ✅      |
+| Card moderation (approve / reject)              |        ❌        |      ✅      |      ✅      |
+| Extended customization                          |        ❌        |      ✅      |      ✅      |
+| Archive / unarchive retros                      |        ❌        |      ✅      |      ✅      |
+| Data retention                                  | 365 days (fixed) | Configurable | Configurable |
+| Teams                                           |        0         |      3       |  Unlimited   |
+| Scrum Master / Team Lead roles                  |        ❌        |      ❌      |      ✅      |
+| Zero-knowledge encryption                       |        ❌        |      ❌      |      ✅      |
+| Support priority                                |        —         |     High     |     Top      |
 
 ### Admin Panel (`/admin`)
+
 - Dashboard with platform-wide reports (user count, retro count, active retros, team count, MRR estimates)
 - User management (view all users, promote/demote admin role, view subscription status)
 - App settings: customize app name, description, logo, and favicon
@@ -113,18 +127,18 @@ Everything from Individual, plus:
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router, Turbopack) |
-| Language | TypeScript 5 |
-| Styling | TailwindCSS v4 |
-| Database | PostgreSQL |
-| ORM | Drizzle ORM + drizzle-kit |
-| Auth | better-auth (email/password + conditional social OAuth) |
-| Payments | PayPal (@paypal/paypal-server-sdk) |
-| Image Storage | Cloudinary (cloudinary npm SDK) |
-| Email | Nodemailer (optional SMTP for team invitations) |
-| Runtime | Node.js 20+ |
+| Layer         | Technology                                              |
+| ------------- | ------------------------------------------------------- |
+| Framework     | Next.js 16 (App Router, Turbopack)                      |
+| Language      | TypeScript 5                                            |
+| Styling       | TailwindCSS v4                                          |
+| Database      | PostgreSQL                                              |
+| ORM           | Drizzle ORM + drizzle-kit                               |
+| Auth          | better-auth (email/password + conditional social OAuth) |
+| Payments      | PayPal (@paypal/paypal-server-sdk)                      |
+| Image Storage | Cloudinary (cloudinary npm SDK)                         |
+| Email         | Nodemailer (optional SMTP for team invitations)         |
+| Runtime       | Node.js 20+                                             |
 
 ## Getting Started
 
@@ -334,17 +348,17 @@ The schema includes these tables:
 
 Feature access is controlled by `src/lib/plans.ts`, which defines feature flags per plan:
 
-| Feature flag | Anonymous | Individual | Company |
-|---|---|---|---|
-| `maxTeams` | 0 | 3 | Unlimited (`-1`) |
-| `participantLimit` | Admin-configurable (default 50) | Unlimited | Unlimited |
-| `privateRetros` | — | ✅ | ✅ |
-| `advancedFacilitation` (moderation) | — | ✅ | ✅ |
-| `extendedCustomization` | — | ✅ | ✅ |
-| `infiniteArchive` | — | ✅ | ✅ |
-| `configurableRetention` | — | ✅ | ✅ |
-| `zeroKnowledgeEncryption` | — | — | ✅ |
-| `prioritySupport` | `none` | `high` | `top` |
+| Feature flag                        | Anonymous                       | Individual | Company          |
+| ----------------------------------- | ------------------------------- | ---------- | ---------------- |
+| `maxTeams`                          | 0                               | 3          | Unlimited (`-1`) |
+| `participantLimit`                  | Admin-configurable (default 50) | Unlimited  | Unlimited        |
+| `privateRetros`                     | —                               | ✅         | ✅               |
+| `advancedFacilitation` (moderation) | —                               | ✅         | ✅               |
+| `extendedCustomization`             | —                               | ✅         | ✅               |
+| `infiniteArchive`                   | —                               | ✅         | ✅               |
+| `configurableRetention`             | —                               | ✅         | ✅               |
+| `zeroKnowledgeEncryption`           | —                               | —          | ✅               |
+| `prioritySupport`                   | `none`                          | `high`     | `top`            |
 
 The `getCurrentUserPlan()` function reads the user's subscription from the database and returns the active feature set. `hasActiveAccess()` handles cancelled subscriptions that are still within their paid period.
 
@@ -352,16 +366,16 @@ The `getCurrentUserPlan()` function reads the user's subscription from the datab
 
 Gating is applied on the **server** (authoritative) and mirrored in the **UI** (for a good experience):
 
-| Restriction | Server enforcement | UI behaviour |
-|---|---|---|
-| 3-card cap on free plan | `POST /api/cards` counts existing cards and returns `403` for `anonymous` retros at 3 | Error toast: *"The free plan is limited to 3 cards per retrospective. Upgrade to add more."* |
-| Markdown export | — | Export button hidden unless `retro.plan !== "anonymous"` |
-| Private retros | `POST /api/retros` rejects `visibility: "private"` without `privateRetros` | Toggle disabled with an upgrade hint |
-| Moderation | `POST /api/cards/moderation` verifies the retro is moderated and the caller is owner/facilitator/admin | Moderation panel only rendered for facilitators on moderated retros |
-| Configurable retention | `POST /api/retros` forces 365 days for anonymous; validates 1–3650 (or 0/-1 = forever) for paid | Dropdown disabled with *"Upgrade to configure"* |
-| Archive / unarchive | `PATCH /api/retros/[id]` requires ownership and a paid plan | Archive button only shown to owners of paid retros |
-| Scrum Master / Team Lead | `PATCH /api/teams/[id]/members` requires the Company plan for those roles | Role options disabled for non-Company plans |
-| Zero-knowledge encryption | `POST /api/retros` rejects `encryptionEnabled` without the Company plan | Toggle + password fields only enabled on Company plan |
+| Restriction               | Server enforcement                                                                                     | UI behaviour                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| 3-card cap on free plan   | `POST /api/cards` counts existing cards and returns `403` for `anonymous` retros at 3                  | Error toast: _"The free plan is limited to 3 cards per retrospective. Upgrade to add more."_ |
+| Markdown export           | —                                                                                                      | Export button hidden unless `retro.plan !== "anonymous"`                                     |
+| Private retros            | `POST /api/retros` rejects `visibility: "private"` without `privateRetros`                             | Toggle disabled with an upgrade hint                                                         |
+| Moderation                | `POST /api/cards/moderation` verifies the retro is moderated and the caller is owner/facilitator/admin | Moderation panel only rendered for facilitators on moderated retros                          |
+| Configurable retention    | `POST /api/retros` forces 365 days for anonymous; validates 1–3650 (or 0/-1 = forever) for paid        | Dropdown disabled with _"Upgrade to configure"_                                              |
+| Archive / unarchive       | `PATCH /api/retros/[id]` requires ownership and a paid plan                                            | Archive button only shown to owners of paid retros                                           |
+| Scrum Master / Team Lead  | `PATCH /api/teams/[id]/members` requires the Company plan for those roles                              | Role options disabled for non-Company plans                                                  |
+| Zero-knowledge encryption | `POST /api/retros` rejects `encryptionEnabled` without the Company plan                                | Toggle + password fields only enabled on Company plan                                        |
 
 ### Zero-knowledge encryption
 
