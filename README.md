@@ -1,10 +1,11 @@
 # RetroMo
 
-A full-featured retrospective application inspired by [retrotool.io](https://retrotool.io). Run agile retrospectives with your team using post-it style cards, dot voting, action points, timers, and facilitator controls — all in real-time.
+A full-featured retrospective application. Run agile retrospectives with your team using post-it style cards, dot voting, action points, timers, and facilitator controls — all in real-time.
 
 ## Features
 
 ### Core Retrospective Board
+
 - **Templates**: Mad/Sad/Glad, Liked/Learned/Lacked, Start/Stop/Continue, or blank slate
 - **Custom columns**: Add, remove, reorder, rename, and color-code columns
 - **Post-it cards**: Colorful sticky notes with text, emoji, and image support
@@ -13,17 +14,20 @@ A full-featured retrospective application inspired by [retrotool.io](https://ret
 - **Anonymous or named participation**: Choose whether cards are tied to participant names
 
 ### Dot Voting
+
 - Configurable votes per participant, per column, and per card
 - Secret voting mode (results hidden until facilitator reveals) or public voting
 - Real-time vote counts
 
 ### Action Points
+
 - Capture actionable items directly from the retrospective
 - Assign owners and due dates
 - Track status (open / done)
 - Team-level action point overview
 
 ### Facilitator Tools
+
 - Lock the board (read-only mode)
 - Toggle secret voting on/off
 - Set a countdown timer (1, 3, 5, 10, 15 minutes)
@@ -31,11 +35,13 @@ A full-featured retrospective application inspired by [retrotool.io](https://ret
 - Copy share link to invite participants
 
 ### Real-time Collaboration
+
 - Live updates via polling (cards, votes, participants, action points sync automatically)
 - Participant list with avatars and colors
 - Ready check for participants
 
 ### Teams
+
 - Create teams with custom names and colors
 - Invite members by email
 - Group retrospectives under a team
@@ -43,26 +49,28 @@ A full-featured retrospective application inspired by [retrotool.io](https://ret
 - Owner and member roles
 
 ### Authentication
+
 - Email & password sign up / sign in (powered by [better-auth](https://better-auth.com))
 - Optional Google and GitHub OAuth social login
 - Anonymous guest participation (no account required for free retros)
 
 ### Plans
+
 - **Anonymous** (Free): No account needed, retros retained for 365 days
 - **Individual** ($10/mo): Personal account, unlimited retros
 - **Company** ($20/mo): Teams, member management, action point tracking
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
+| Layer     | Technology                         |
+| --------- | ---------------------------------- |
 | Framework | Next.js 16 (App Router, Turbopack) |
-| Language | TypeScript 5 |
-| Styling | TailwindCSS v4 |
-| Database | PostgreSQL |
-| ORM | Drizzle ORM + drizzle-kit |
-| Auth | better-auth |
-| Runtime | Node.js 20+ |
+| Language  | TypeScript 5                       |
+| Styling   | TailwindCSS v4                     |
+| Database  | PostgreSQL                         |
+| ORM       | Drizzle ORM + drizzle-kit          |
+| Auth      | better-auth                        |
+| Runtime   | Node.js 20+                        |
 
 ## Getting Started
 
