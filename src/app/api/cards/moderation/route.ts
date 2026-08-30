@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { cards, retros, retroParticipants, user } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { cards, retros } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/session";
+import { isModerationExempt } from "@/lib/retro-access";
 
 /**
  * Moderation endpoint — approve or reject a pending card.
@@ -36,28 +37,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "This retro is not moderated" }, { status: 400 });
     }
 
-    // Check authorization: must be a facilitator, the retro owner, or an admin
-    const participants = await db.query.retroParticipants.findMany({
-      where: eq(retroParticipants.retroId, retro.id),
-    });
-
-    let isAuthorized = false;
-
-    // Check if logged-in user is the owner or a facilitator
-    if (session?.user) {
-      if (retro.ownerId === session.user.id) {
-        isAuthorized = true;
-      } else {
-        const p = participants.find((p) => p.userId === session.user.id);
-        if (p?.isFacilitator) isAuthorized = true;
-      }
-    }
-
-    // Check admin role
-    if (session?.user) {
-      const u = await db.query.user.findFirst({ where: eq(user.id, session.user.id) });
-      if (u?.role === "admin") isAuthorized = true;
-    }
+    // Check authorization: must be a facilitator, the retro owner, or an admin.
+    // This is exactly the same set of people who are exempt from moderation.
+    const isAuthorized = await isModerationExempt(retro, session);
 
     if (!isAuthorized) {
       return NextResponse.json(
@@ -67,9 +49,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "approve") {
+      // Approving publishes the card to the shared board.
       const [updated] = await db
         .update(cards)
-        .set({ approved: true, updatedAt: new Date() })
+        .set({ approved: true, isPublic: true, updatedAt: new Date() })
         .where(eq(cards.id, id))
         .returning();
       return NextResponse.json(updated);

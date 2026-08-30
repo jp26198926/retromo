@@ -4,6 +4,7 @@ import { cards, columns, retroParticipants, retros } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession } from "@/lib/session";
 import { CARD_COLOR_KEYS } from "@/lib/card-colors";
+import { checkRetroAccess, isModerationExempt } from "@/lib/retro-access";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,9 +20,15 @@ export async function POST(req: NextRequest) {
     if (!col) return NextResponse.json({ error: "Column not found" }, { status: 404 });
 
     // Cards are unlimited on every plan. The retro lookup is still needed so we
-    // know whether this retro is moderated (cards start as pending if it is).
+    // can enforce private-retro access and resolve moderation on publish.
     const retro = await db.query.retros.findFirst({ where: eq(retros.id, retroId) });
     if (!retro) return NextResponse.json({ error: "Retro not found" }, { status: 404 });
+
+    // Private retrospectives require a signed-in account
+    const access = checkRetroAccess(retro, session);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error, reason: access.reason }, { status: access.status });
+    }
 
     // Determine author name and card color
     let resolvedAuthorName = session?.user?.name || authorName || null;
@@ -46,6 +53,18 @@ export async function POST(req: NextRequest) {
       resolvedAuthorParticipantId = participantId;
     }
 
+    // Moderation is applied when a card is PUBLISHED to the shared space, not
+    // when it is written. A card that stays in the author's private area is
+    // only ever visible to its author, so there is nothing to review yet.
+    //
+    // The host, facilitators and platform admins are exempt from moderation —
+    // their cards go straight to the board.
+    let approved = true;
+    if (retro.moderated && isPublic) {
+      const exempt = await isModerationExempt(retro, session, resolvedAuthorParticipantId ?? participantId);
+      approved = exempt;
+    }
+
     const id = crypto.randomUUID();
     const [card] = await db
       .insert(cards)
@@ -59,8 +78,7 @@ export async function POST(req: NextRequest) {
         authorName: resolvedAuthorName,
         authorParticipantId: resolvedAuthorParticipantId,
         isPublic,
-        // In moderated retros, new cards start as pending (not approved)
-        approved: !retro.moderated,
+        approved,
         position: 0,
       })
       .returning();
@@ -120,6 +138,29 @@ export async function PATCH(req: NextRequest) {
     if (position !== undefined) patch.position = position;
     if (imageUrl !== undefined) patch.imageUrl = imageUrl;
 
+    // Moderation trigger: publishing a card to the shared space.
+    // Only the transition private -> public is reviewed, and only for people
+    // who are not the host / a facilitator / an admin.
+    let heldForReview = false;
+    if (isPublic === true && existing.isPublic === false) {
+      const retro = await db.query.retros.findFirst({ where: eq(retros.id, existing.retroId) });
+      if (retro?.moderated) {
+        const exempt = await isModerationExempt(retro, session, anonymousParticipantId);
+        if (!exempt) {
+          patch.approved = false;
+          heldForReview = true;
+        } else {
+          patch.approved = true;
+        }
+      }
+    }
+
+    // Un-publishing returns the card to the author's private area. Clear any
+    // pending review state so it is not stuck in the moderation queue.
+    if (isPublic === false && existing.isPublic === true) {
+      patch.approved = true;
+    }
+
     const [updated] = await db
       .update(cards)
       .set(patch)
@@ -127,7 +168,7 @@ export async function PATCH(req: NextRequest) {
       .returning();
 
     if (!updated) return NextResponse.json({ error: "Card not found" }, { status: 404 });
-    return NextResponse.json(updated);
+    return NextResponse.json({ ...updated, heldForReview });
   } catch (e) {
     console.error("[PATCH /api/cards]", e);
     return NextResponse.json({ error: "Failed to update card" }, { status: 500 });

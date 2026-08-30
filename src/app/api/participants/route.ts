@@ -5,6 +5,7 @@ import { eq, and, count } from "drizzle-orm";
 import { getSession } from "@/lib/session";
 import { randomColor, randomDisplayName } from "@/lib/utils";
 import { getAppSettings } from "@/lib/app-settings";
+import { checkRetroAccess } from "@/lib/retro-access";
 
 // Join a retro as a participant (creates or returns existing)
 export async function POST(req: NextRequest) {
@@ -18,6 +19,12 @@ export async function POST(req: NextRequest) {
     // Look up the retro to check its plan
     const retro = await db.query.retros.findFirst({ where: eq(retros.id, retroId) });
     if (!retro) return NextResponse.json({ error: "Retro not found" }, { status: 404 });
+
+    // Private retrospectives require a signed-in account to join
+    const access = checkRetroAccess(retro, session);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error, reason: access.reason }, { status: access.status });
+    }
 
     // If logged in, find existing by userId
     if (session?.user) {

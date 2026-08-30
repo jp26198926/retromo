@@ -36,11 +36,25 @@ A full-featured retrospective application. Run agile retrospectives with your te
 - Ready check for participants
 - **Card moderation panel** (paid plans) — a floating panel with a pending-count badge lets facilitators approve or reject cards before they become visible to the rest of the team
 
+#### How moderation works
+
+Moderation is applied at the moment a card is **published to the shared space**, not when it is written:
+
+- Writing a card into your own private column area never triggers review — that card is only visible to you, so there is nothing to moderate yet. You always see your own cards, pending or not.
+- Publishing a card (the share toggle, or dragging it into the public area) is what sends it to the review queue. The author keeps seeing their card with a _"Pending review"_ badge and gets a toast confirming it was sent for approval.
+- **The host, facilitators and platform admins are exempt.** Their cards go straight to the board without entering the queue, since they are the ones running the review.
+- Approving a card publishes it to everyone; rejecting deletes it. Turning moderation off releases everything still waiting in the queue so no card is ever left stranded.
+- Un-publishing a card returns it to the author's private area and clears its pending state.
+
+Visibility is enforced on the server: `GET /api/retros/[id]` never sends another participant's private or unapproved cards, so the rules cannot be bypassed from the client.
+
 ### Real-time Collaboration
 
 - Live updates via polling (cards, votes, participants, action points sync automatically)
 - Participant list with avatars and colors
 - Retro history dashboard with search, filtering (by plan, team, role), sorting, and pagination
+- Archived retros are hidden from the list by default, with a **Show archived** toggle (and a count badge) to bring them back into view
+- The dashboard shows the 3 most recently updated retros with a **View all** link through to the full list
 
 ### Teams
 
@@ -55,6 +69,22 @@ A full-featured retrospective application. Run agile retrospectives with your te
 - Email & password sign up / sign in (powered by [better-auth](https://better-auth.com))
 - Optional Google and GitHub OAuth social login (auto-hidden if not configured)
 - Anonymous guest participation (no account required for free retros)
+
+#### Private retrospectives require an account
+
+Turning on **Private retrospective** (Individual and Company plans) restricts the board to signed-in users. Sharing the link is no longer enough — anonymous visitors are blocked.
+
+This is enforced server-side on every entry point, each returning `401` with `reason: "auth_required"` when there is no session:
+
+| Endpoint                     | Effect for anonymous visitors on a private retro |
+| ---------------------------- | ------------------------------------------------ |
+| `GET /api/retros/[id]`       | Board data is not returned                       |
+| `POST /api/participants`     | Cannot join the retro                            |
+| `POST /api/cards`            | Cannot create cards                              |
+| `POST /api/votes`            | Cannot vote                                      |
+| `POST /api/action-points`    | Cannot add action points                         |
+
+The board page detects that response and shows a _"This retrospective is private"_ screen with sign-in / sign-up buttons that return the visitor to the board after authenticating, rather than a raw error. The shared logic lives in `src/lib/retro-access.ts`.
 
 ### Plans & Billing
 
@@ -78,8 +108,8 @@ Everything from Anonymous, plus:
 
 - **Unlimited columns per retrospective** — the 3-column free cap is lifted
 - **Data export to Markdown** — export button appears on the board
-- **Private, invite-only retrospectives** — restrict access to invited participants
-- **Card moderation** — cards start as _pending_ and require facilitator approval before appearing publicly
+- **Private retrospectives** — the board requires a signed-in account; anonymous visitors are blocked even with the link
+- **Card moderation** — participant cards need facilitator approval when published to the shared board; the host and facilitators are exempt
 - **Advanced facilitation tools** — secret voting, countdown timer, read-only lock mode
 - **Extended retro customization** — custom columns, image filters (blur, translucent)
 - **Manage up to 3 teams**
@@ -317,6 +347,7 @@ src/
     ├── session.ts                # Server-side session helper
     ├── admin.ts                  # Admin session helper
     ├── plans.ts                  # Plan feature flags + current user plan
+    ├── retro-access.ts           # Private-retro auth guard + moderation exemption
     ├── app-settings.ts           # App settings singleton helper
     ├── templates.ts              # Built-in retro templates
     ├── card-colors.ts            # Post-it color palette
@@ -372,8 +403,8 @@ Gating is applied on the **server** (authoritative) and mirrored in the **UI** (
 | ------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
 | 3-column cap on free plan | `POST /api/retros` compares `columns.length` against `maxColumns` and returns `403` before touching the database                | "+ Add column" is disabled at the cap, with a _"3 of 3 columns used on the free plan"_ hint and an upgrade link |
 | Markdown export           | —                                                                                                      | Export button hidden unless `retro.plan !== "anonymous"`                                     |
-| Private retros            | `POST /api/retros` rejects `visibility: "private"` without `privateRetros`                             | Toggle disabled with an upgrade hint                                                         |
-| Moderation                | `POST /api/cards/moderation` verifies the retro is moderated and the caller is owner/facilitator/admin | Moderation panel only rendered for facilitators on moderated retros                          |
+| Private retros            | `POST /api/retros` rejects `visibility: "private"` without `privateRetros`; the board, join, card, vote and action-point endpoints return `401` to anonymous visitors | Toggle disabled with an upgrade hint; visitors get a "sign in to continue" screen |
+| Moderation                | `POST /api/cards/moderation` verifies the retro is moderated and the caller is owner/facilitator/admin | Moderation panel only rendered for the host, facilitators and admins                         |
 | Configurable retention    | `POST /api/retros` forces 365 days for anonymous; validates 1–3650 (or 0/-1 = forever) for paid        | Dropdown disabled with _"Upgrade to configure"_                                              |
 | Archive / unarchive       | `PATCH /api/retros/[id]` requires ownership (or admin) and a paid plan                                | Archive button shown to owners of paid retros and to admins                                  |
 | Scrum Master / Team Lead  | `PATCH /api/teams/[id]/members` requires the Company plan for those roles                              | Role options disabled for non-Company plans                                                  |

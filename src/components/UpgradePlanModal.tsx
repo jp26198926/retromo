@@ -56,7 +56,7 @@ export function UpgradePlanModal({ open, currentPlan, onCancel, onSuccess }: Upg
       features: [
         "Unlimited columns per retrospective",
         "Data export to Markdown",
-        "Private, invite-only retrospectives",
+        "Private retrospectives — sign-in required to join",
         "Card moderation (approve / reject)",
         "Advanced facilitation tools",
         "Extended retro customization",

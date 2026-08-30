@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -8,11 +8,27 @@ import { Button } from "@/components/Button";
 import { useSession } from "@/lib/auth-client";
 import { timeAgo } from "@/lib/utils";
 
+/** How many retrospectives the dashboard shows before linking to the full list. */
+const RECENT_RETROS_LIMIT = 3;
+
 export default function DashboardPage() {
   const { data: session, isPending } = useSession();
   const [retros, setRetros] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // The dashboard is a summary: show only the most recently updated retros and
+  // send people to /retro for the complete list.
+  const recentRetros = useMemo(
+    () =>
+      [...retros]
+        .sort(
+          (a, b) =>
+            new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime()
+        )
+        .slice(0, RECENT_RETROS_LIMIT),
+    [retros]
+  );
 
   useEffect(() => {
     if (!session) return;
@@ -62,7 +78,14 @@ export default function DashboardPage() {
           </div>
 
           <section className="mt-10">
-            <h2 className="mb-4 text-lg font-semibold text-neutral-900">Recent retrospectives</h2>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-neutral-900">Recent retrospectives</h2>
+              {retros.length > 0 && (
+                <Link href="/retro" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                  View all →
+                </Link>
+              )}
+            </div>
             {loading ? (
               <p className="text-neutral-500">Loading…</p>
             ) : retros.length === 0 ? (
@@ -73,22 +96,33 @@ export default function DashboardPage() {
                 </Link>
               </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {retros.map((r: any) => (
-                  <Link
-                    key={r.id}
-                    href={`/retro/${r.id}`}
-                    className="group rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">{r.plan}</span>
-                      <span className="text-xs text-neutral-400">{timeAgo(r.updatedAt)}</span>
-                    </div>
-                    <h3 className="mt-3 font-semibold text-neutral-900 group-hover:text-indigo-600">{r.title}</h3>
-                    {r.topic && <p className="mt-1 text-sm text-neutral-500">{r.topic}</p>}
-                  </Link>
-                ))}
-              </div>
+              <>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {recentRetros.map((r: any) => (
+                    <Link
+                      key={r.id}
+                      href={`/retro/${r.id}`}
+                      className="group rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">{r.plan}</span>
+                        <span className="text-xs text-neutral-400">{timeAgo(r.updatedAt)}</span>
+                      </div>
+                      <h3 className="mt-3 font-semibold text-neutral-900 group-hover:text-indigo-600">{r.title}</h3>
+                      {r.topic && <p className="mt-1 text-sm text-neutral-500">{r.topic}</p>}
+                    </Link>
+                  ))}
+                </div>
+                {retros.length > RECENT_RETROS_LIMIT && (
+                  <div className="mt-4 text-center">
+                    <Link href="/retro">
+                      <Button variant="outline" size="sm">
+                        View all {retros.length} retrospectives
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </>
             )}
           </section>
 

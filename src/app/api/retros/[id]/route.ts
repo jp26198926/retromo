@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { getSession } from "@/lib/session";
 import { getCurrentUserPlan, hasActiveAccess } from "@/lib/plans";
 import { isAdmin } from "@/lib/admin";
+import { checkRetroAccess } from "@/lib/retro-access";
 
 export async function GET(
   req: NextRequest,
@@ -17,6 +18,12 @@ export async function GET(
 
   const retro = await db.query.retros.findFirst({ where: eq(retros.id, id) });
   if (!retro) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Private retrospectives are only readable by signed-in users.
+  const access = checkRetroAccess(retro, session);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error, reason: access.reason }, { status: access.status });
+  }
 
   const cols = await db.query.columns.findMany({
     where: eq(columns.retroId, id),
@@ -56,21 +63,35 @@ export async function GET(
       participants.find((p) => p.anonymousSessionId === anonymousSessionId) || null;
   }
 
-  // Filter private cards: only show private cards belonging to the current participant.
-  // Public cards are always visible. Private cards from other users are hidden.
   const currentParticipantId = currentParticipant?.id || null;
   const currentUserId = session?.user?.id || null;
 
-  const visibleCards = cardsWithVotes.filter((c) => {
-    if (c.isPublic) return true;
-    // Private card — only visible if it belongs to the current participant
-    if (currentParticipantId) {
-      // Match by authorId (logged-in) or by authorName matching displayName
-      // For anonymous users, cards are tagged with the participant's display name
-      if (c.authorId === currentUserId) return true;
-      if (!currentUserId && c.authorName && currentParticipant?.displayName === c.authorName) return true;
-    }
+  // Is this viewer allowed to see cards awaiting moderation?
+  // The host, facilitators and platform admins review the queue, so they see
+  // everything. Everyone else only ever sees approved public cards.
+  const viewerIsHost = !!(currentUserId && retro.ownerId && retro.ownerId === currentUserId);
+  const viewerIsFacilitator = !!currentParticipant?.isFacilitator;
+  const viewerIsAdmin = await isAdmin();
+  const canSeePending = viewerIsHost || viewerIsFacilitator || viewerIsAdmin;
+
+  // Does a card belong to the person making this request?
+  const isOwnCard = (c: (typeof cardsWithVotes)[number]) => {
+    if (currentUserId && c.authorId === currentUserId) return true;
+    if (currentParticipantId && c.authorParticipantId === currentParticipantId) return true;
+    // Legacy fallback for anonymous cards stored before authorParticipantId existed
+    if (!currentUserId && c.authorName && currentParticipant?.displayName === c.authorName) return true;
     return false;
+  };
+
+  // Visibility rules:
+  //  - Private cards are only visible to their author.
+  //  - Public cards are visible to everyone once approved.
+  //  - Public cards awaiting moderation are visible to their author (so it never
+  //    looks like the card vanished) and to the moderators.
+  const visibleCards = cardsWithVotes.filter((c) => {
+    if (!c.isPublic) return isOwnCard(c);
+    if (c.approved) return true;
+    return isOwnCard(c) || canSeePending;
   });
 
   return NextResponse.json({
@@ -81,6 +102,10 @@ export async function GET(
     participants,
     currentUserId,
     currentParticipant,
+    // Moderation context for the UI: who runs the queue, and who is exempt
+    // from review when publishing a card.
+    canModerate: canSeePending,
+    moderationExempt: canSeePending,
   });
 }
 

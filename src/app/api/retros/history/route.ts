@@ -19,6 +19,9 @@ export async function GET(req: Request) {
     const planFilter = url.searchParams.get("plan") || "";
     const teamFilter = url.searchParams.get("teamId") || "";
     const roleFilter = url.searchParams.get("role") || ""; // "owner" | "participant" | ""
+    // Archived retros are hidden by default; the list page has a toggle that
+    // sets includeArchived=true to bring them back into view.
+    const includeArchived = url.searchParams.get("includeArchived") === "true";
     const sortBy = url.searchParams.get("sortBy") || "updatedAt";
     const sortDir = url.searchParams.get("sortDir") || "desc";
     const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
@@ -79,6 +82,20 @@ export async function GET(req: Request) {
       whereClause = and(whereClause, eq(retros.teamId, teamFilter)) as typeof whereClause;
     }
 
+    // Count how many archived retros are available, so the UI can label the
+    // "show archived" toggle. This is computed before the archived filter is
+    // applied so the number is stable whether the toggle is on or off.
+    const archivedCountRows = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(retros)
+      .where(and(whereClause, eq(retros.archived, true)));
+    const archivedCount = archivedCountRows[0]?.count || 0;
+
+    // Hide archived retros unless explicitly requested
+    if (!includeArchived) {
+      whereClause = and(whereClause, eq(retros.archived, false)) as typeof whereClause;
+    }
+
     // Determine sort
     const sortColumn =
       sortBy === "title" ? retros.title :
@@ -132,6 +149,8 @@ export async function GET(req: Request) {
       page,
       pageSize,
       totalPages: Math.ceil(total / pageSize),
+      archivedCount,
+      includeArchived,
     });
   } catch (e) {
     console.error("[GET /api/retros/history]", e);

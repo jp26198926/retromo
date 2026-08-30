@@ -30,6 +30,10 @@ export type RetroState = {
   participants: { id: string; userId: string | null; displayName: string | null; color: string | null; isFacilitator: boolean; ready: boolean }[];
   currentUserId: string | null;
   currentParticipant: { id: string; displayName: string | null; color: string | null; isFacilitator: boolean } | null;
+  /** Viewer can approve/reject cards in the moderation queue. */
+  canModerate: boolean;
+  /** Viewer's own cards skip the review queue (host / facilitator / admin). */
+  moderationExempt: boolean;
 };
 
 // Generate and persist a unique anonymous session ID per browser tab.
@@ -50,6 +54,8 @@ export function useRetroBoard(retroId: string) {
   const [state, setState] = useState<RetroState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Set when the retro is private and the visitor is not signed in.
+  const [authRequired, setAuthRequired] = useState(false);
   const [joined, setJoined] = useState(false);
   const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const anonSessionRef = useRef<string | null>(null);
@@ -67,9 +73,19 @@ export function useRetroBoard(retroId: string) {
         ? `/api/retros/${retroId}?anon=${encodeURIComponent(anonSessionId)}`
         : `/api/retros/${retroId}`;
       const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to load board");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        // Private retrospective and the visitor is not signed in.
+        if (res.status === 401 && data?.reason === "auth_required") {
+          setAuthRequired(true);
+          setError(data.error || "This retrospective is private. Please sign in to continue.");
+          return;
+        }
+        throw new Error(data?.error || "Failed to load board");
+      }
       const data = await res.json();
       setState(data);
+      setAuthRequired(false);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load board");
@@ -83,9 +99,10 @@ export function useRetroBoard(retroId: string) {
     fetchState();
   }, [fetchState]);
 
-  // Join as participant once on mount
+  // Join as participant once on mount.
+  // Skipped for private retros the visitor cannot access.
   useEffect(() => {
-    if (joined) return;
+    if (joined || authRequired) return;
     (async () => {
       try {
         await fetch("/api/participants", {
@@ -99,13 +116,15 @@ export function useRetroBoard(retroId: string) {
         /* ignore */
       }
     })();
-  }, [joined, retroId, anonSessionId, fetchState]);
+  }, [joined, authRequired, retroId, anonSessionId, fetchState]);
 
-  // Poll for realtime updates every 3s
+  // Poll for realtime updates every 3s.
+  // No point polling a board we are not allowed to read.
   useEffect(() => {
+    if (authRequired) return;
     refreshTimer.current = setInterval(fetchState, 3000);
     return () => { if (refreshTimer.current) clearInterval(refreshTimer.current); };
-  }, [fetchState]);
+  }, [fetchState, authRequired]);
 
   // Update display name for the current participant (anonymous or logged-in)
   const updateName = useCallback(async (name: string) => {
@@ -122,5 +141,5 @@ export function useRetroBoard(retroId: string) {
     }
   }, [state?.currentParticipant?.id, fetchState]);
 
-  return { state, loading, error, refresh: fetchState, updateName, anonSessionId };
+  return { state, loading, error, authRequired, refresh: fetchState, updateName, anonSessionId };
 }

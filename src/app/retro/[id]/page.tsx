@@ -17,7 +17,7 @@ import { encryptContent, decryptContent, looksEncrypted } from "@/lib/crypto";
 export default function RetroBoardPage() {
   const params = useParams<{ id: string }>();
   const retroId = params.id;
-  const { state, loading, error, refresh, updateName } = useRetroBoard(retroId);
+  const { state, loading, error, authRequired, refresh, updateName } = useRetroBoard(retroId);
   const { data: sessionData } = useSession();
   const [showAP, setShowAP] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -135,11 +135,21 @@ export default function RetroBoardPage() {
     const card = state?.cards.find((c) => c.id === cardId);
     if (!card) return;
     const pid = state?.currentParticipant?.id || null;
-    await fetch("/api/cards", {
+    const res = await fetch("/api/cards", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: cardId, isPublic: !card.isPublic, anonymousParticipantId: pid }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      flash(data.error || "Could not update card");
+    } else {
+      // Moderated retros hold newly published cards for facilitator review.
+      const data = await res.json().catch(() => ({}));
+      if (data?.heldForReview) {
+        flash("Card sent for review — it will appear once a facilitator approves it.");
+      }
+    }
     refresh();
   }
 
@@ -155,11 +165,19 @@ export default function RetroBoardPage() {
 
   async function dropCard(cardId: string, columnId: string, isPublic: boolean) {
     const pid = state?.currentParticipant?.id || null;
-    await fetch("/api/cards", {
+    const res = await fetch("/api/cards", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: cardId, columnId, isPublic, anonymousParticipantId: pid }),
     });
+    if (res.ok) {
+      // Dragging a card into the shared area publishes it, which in a moderated
+      // retro sends it to the review queue.
+      const data = await res.json().catch(() => ({}));
+      if (data?.heldForReview) {
+        flash("Card sent for review — it will appear once a facilitator approves it.");
+      }
+    }
     refresh();
   }
 
@@ -308,17 +326,19 @@ export default function RetroBoardPage() {
     [state?.columns]
   );
 
-  // Prepare cards for display:
-  // 1. In moderated retros, non-facilitators only see approved cards.
-  //    Facilitators see all cards (pending ones show a "pending" badge).
-  // 2. If encryption is enabled, replace encrypted content with decrypted plaintext.
+  // Prepare cards for display.
+  //
+  // Visibility is already enforced authoritatively by the server, which never
+  // sends another participant's private or unapproved cards. We deliberately do
+  // NOT re-filter on `approved` here: the author must always be able to see
+  // their own card while it waits for review, otherwise writing a card in a
+  // moderated retro looks like nothing happened.
+  //
+  // The only client-side transformation left is decrypting content when the
+  // retro uses zero-knowledge encryption.
   const displayCards = useMemo(() => {
     if (!state?.cards) return [];
-    const isFac = state.currentParticipant?.isFacilitator || false;
     let cards = state.cards;
-    if (state.retro.moderated && !isFac) {
-      cards = cards.filter((c) => c.approved);
-    }
     if (encryptionEnabled && encryptionPassword && Object.keys(decryptedCards).length > 0) {
       cards = cards.map((c) => ({
         ...c,
@@ -326,12 +346,35 @@ export default function RetroBoardPage() {
       }));
     }
     return cards;
-  }, [state?.cards, state?.retro?.moderated, state?.currentParticipant?.isFacilitator, encryptionEnabled, encryptionPassword, decryptedCards]);
+  }, [state?.cards, encryptionEnabled, encryptionPassword, decryptedCards]);
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-neutral-500">Loading board…</p>
+      </div>
+    );
+  }
+  // Private retrospective and the visitor is not signed in — invite them to log in
+  // instead of showing a raw error.
+  if (authRequired) {
+    const returnTo = encodeURIComponent(`/retro/${retroId}`);
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+        <div className="text-4xl">🔒</div>
+        <h1 className="text-xl font-semibold text-neutral-900">This retrospective is private</h1>
+        <p className="max-w-md text-sm text-neutral-500">
+          The host restricted this board to signed-in members. Please sign in with your
+          account to view and take part in the session.
+        </p>
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+          <Link href={`/sign-in?callbackURL=${returnTo}`}>
+            <Button>Sign in</Button>
+          </Link>
+          <Link href={`/sign-up?callbackURL=${returnTo}`}>
+            <Button variant="ghost">Create an account</Button>
+          </Link>
+        </div>
       </div>
     );
   }
@@ -598,10 +641,12 @@ export default function RetroBoardPage() {
         </div>
       )}
 
-      {/* Moderation panel for facilitators */}
-      {retroData.moderated && (state.currentParticipant?.isFacilitator || canControl) && (
+      {/* Moderation panel — only for the host, facilitators and admins.
+          Only cards published to the shared space await review; cards still in
+          an author's private area are not part of the queue. */}
+      {retroData.moderated && (state.canModerate || state.currentParticipant?.isFacilitator || canControl) && (
         <ModerationPanel
-          cards={state.cards.filter((c) => !c.approved)}
+          cards={displayCards.filter((c) => c.isPublic && !c.approved)}
           onApprove={approveCard}
           onReject={rejectCard}
         />

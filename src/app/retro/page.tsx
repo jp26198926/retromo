@@ -54,6 +54,9 @@ export default function RetroHistoryPage() {
   const [roleFilter, setRoleFilter] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("updatedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  // Archived retros are hidden by default and revealed with this toggle.
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivedCount, setArchivedCount] = useState(0);
 
   const [teams, setTeams] = useState<TeamOption[]>([]);
 
@@ -82,6 +85,7 @@ export default function RetroHistoryPage() {
     if (planFilter) params.set("plan", planFilter);
     if (teamFilter) params.set("teamId", teamFilter);
     if (roleFilter) params.set("role", roleFilter);
+    if (showArchived) params.set("includeArchived", "true");
     params.set("sortBy", sortBy);
     params.set("sortDir", sortDir);
     params.set("page", String(page));
@@ -94,17 +98,19 @@ export default function RetroHistoryPage() {
         setItems(d.items);
         setTotal(d.total);
         setTotalPages(d.totalPages);
+        setArchivedCount(d.archivedCount ?? 0);
       } else {
         setItems([]);
         setTotal(0);
         setTotalPages(0);
+        setArchivedCount(0);
       }
     } catch {
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [search, planFilter, teamFilter, roleFilter, sortBy, sortDir, page, pageSize]);
+  }, [search, planFilter, teamFilter, roleFilter, showArchived, sortBy, sortDir, page, pageSize]);
 
   useEffect(() => {
     if (session) fetchData();
@@ -127,6 +133,7 @@ export default function RetroHistoryPage() {
     setPlanFilter("");
     setTeamFilter("");
     setRoleFilter("");
+    setShowArchived(false);
     setSortBy("updatedAt");
     setSortDir("desc");
     setPage(1);
@@ -147,8 +154,8 @@ export default function RetroHistoryPage() {
   };
 
   const hasFilters = useMemo(
-    () => search || planFilter || teamFilter || roleFilter,
-    [search, planFilter, teamFilter, roleFilter]
+    () => !!(search || planFilter || teamFilter || roleFilter || showArchived),
+    [search, planFilter, teamFilter, roleFilter, showArchived]
   );
 
   const planBadge = (plan: string) => {
@@ -207,7 +214,10 @@ export default function RetroHistoryPage() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-neutral-900">My retrospectives</h1>
               <p className="mt-1 text-neutral-600">
-                All retros you&apos;ve created or participated in. {total > 0 && <span className="text-neutral-400">({total} total)</span>}
+                {showArchived
+                  ? "All retros you've created or participated in, including archived ones."
+                  : "Retros you've created or participated in. Archived ones are hidden."}{" "}
+                {total > 0 && <span className="text-neutral-400">({total} shown)</span>}
               </p>
             </div>
             <Link href="/new-retrospective">
@@ -274,6 +284,45 @@ export default function RetroHistoryPage() {
                 <option value="participant">Participated in</option>
               </select>
 
+              {/* Show / hide archived retros */}
+              <button
+                type="button"
+                onClick={() => { setShowArchived((v) => !v); setPage(1); }}
+                aria-pressed={showArchived}
+                title={showArchived ? "Hide archived retrospectives" : "Show archived retrospectives"}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                  showArchived
+                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                    : "border-neutral-300 text-neutral-600 hover:bg-neutral-50"
+                )}
+              >
+                <span
+                  className={cn(
+                    "relative h-4 w-7 rounded-full transition-colors",
+                    showArchived ? "bg-indigo-600" : "bg-neutral-300"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all",
+                      showArchived ? "left-3.5" : "left-0.5"
+                    )}
+                  />
+                </span>
+                <span>Show archived</span>
+                {archivedCount > 0 && (
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 py-0.5 text-xs font-semibold",
+                      showArchived ? "bg-indigo-100 text-indigo-700" : "bg-neutral-100 text-neutral-500"
+                    )}
+                  >
+                    {archivedCount}
+                  </span>
+                )}
+              </button>
+
               {hasFilters && (
                 <button
                   onClick={resetFilters}
@@ -321,7 +370,15 @@ export default function RetroHistoryPage() {
                         <p className="text-neutral-500">
                           {hasFilters ? "No retros match your filters." : "No retros yet."}
                         </p>
-                        {!hasFilters && (
+                        {!showArchived && archivedCount > 0 && (
+                          <button
+                            onClick={() => { setShowArchived(true); setPage(1); }}
+                            className="mt-2 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                          >
+                            Show {archivedCount} archived retrospective{archivedCount !== 1 ? "s" : ""}
+                          </button>
+                        )}
+                        {!hasFilters && archivedCount === 0 && (
                           <Link href="/new-retrospective" className="mt-3 inline-block">
                             <Button size="sm">Create your first retro</Button>
                           </Link>

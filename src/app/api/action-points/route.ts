@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { actionPoints } from "@/db/schema";
+import { actionPoints, retros } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/session";
+import { checkRetroAccess } from "@/lib/retro-access";
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,6 +13,15 @@ export async function POST(req: NextRequest) {
 
     if (!retroId || !text?.trim()) {
       return NextResponse.json({ error: "retroId and text required" }, { status: 400 });
+    }
+
+    // Private retrospectives require a signed-in account
+    const parentRetro = await db.query.retros.findFirst({ where: eq(retros.id, retroId) });
+    if (parentRetro) {
+      const access = checkRetroAccess(parentRetro, session);
+      if (!access.ok) {
+        return NextResponse.json({ error: access.error, reason: access.reason }, { status: access.status });
+      }
     }
 
     const [ap] = await db

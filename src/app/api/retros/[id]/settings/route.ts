@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { retros, retroParticipants } from "@/db/schema";
+import { retros, retroParticipants, cards } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession } from "@/lib/session";
 import { getCurrentUserPlan, hasActiveAccess } from "@/lib/plans";
@@ -64,5 +64,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const [updated] = await db.update(retros).set(patch).where(eq(retros.id, id)).returning();
+
+  // Turning moderation off releases everything still waiting in the review
+  // queue, otherwise those cards would stay invisible with no way to approve them.
+  if (body.moderated === false) {
+    await db
+      .update(cards)
+      .set({ approved: true, updatedAt: new Date() })
+      .where(and(eq(cards.retroId, id), eq(cards.approved, false)));
+  }
+
   return NextResponse.json(updated);
 }

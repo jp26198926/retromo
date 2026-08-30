@@ -38,7 +38,7 @@ export default function PlansPage() {
         "Everything from Anonymous, and:",
         "Unlimited columns per retrospective",
         "Data export to Markdown",
-        "Private, invite-only retrospectives",
+        "Private retrospectives — sign-in required to join",
         "Card moderation — approve or reject before they go public",
         "Advanced facilitation tools (secret voting, timer)",
         "Extended retro customization",

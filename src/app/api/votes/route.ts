@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { votes, cards, votes as votesTable } from "@/db/schema";
+import { votes, cards, retros, votes as votesTable } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { getSession } from "@/lib/session";
+import { checkRetroAccess } from "@/lib/retro-access";
 
 // POST = toggle a vote on a card
 export async function POST(req: NextRequest) {
@@ -17,6 +18,15 @@ export async function POST(req: NextRequest) {
 
     const card = await db.query.cards.findFirst({ where: eq(cards.id, cardId) });
     if (!card) return NextResponse.json({ error: "Card not found" }, { status: 404 });
+
+    // Private retrospectives require a signed-in account to vote
+    const parentRetro = await db.query.retros.findFirst({ where: eq(retros.id, retroId) });
+    if (parentRetro) {
+      const access = checkRetroAccess(parentRetro, session);
+      if (!access.ok) {
+        return NextResponse.json({ error: access.error, reason: access.reason }, { status: access.status });
+      }
+    }
 
     const voterId = session?.user?.id || null;
     const existing = await db.query.votes.findFirst({

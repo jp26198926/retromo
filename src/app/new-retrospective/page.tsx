@@ -290,7 +290,7 @@ function NewRetroForm() {
             <div className="flex items-center justify-between rounded-lg border border-neutral-200 p-3">
               <div>
                 <div className="text-sm font-medium text-neutral-800">Private retrospective</div>
-                <div className="text-xs text-neutral-500">Only people with the link can join. {!canPrivate && <span className="text-amber-600">Requires Personal or Company plan.</span>}</div>
+                <div className="text-xs text-neutral-500">Participants must sign in to view and join this board. Anonymous visitors are blocked, even with the link. {!canPrivate && <span className="text-amber-600">Requires Personal or Company plan.</span>}</div>
               </div>
               <button
                 onClick={() => canPrivate && setIsPrivate((v) => !v)}
@@ -308,7 +308,7 @@ function NewRetroForm() {
             <div className="mt-3 flex items-center justify-between rounded-lg border border-neutral-200 p-3">
               <div>
                 <div className="text-sm font-medium text-neutral-800">Moderation</div>
-                <div className="text-xs text-neutral-500">Cards require facilitator approval before appearing publicly. {!canModerate && <span className="text-amber-600">Requires Personal or Company plan.</span>}</div>
+                <div className="text-xs text-neutral-500">Cards need facilitator approval when a participant posts them to the shared board. You and your facilitators are exempt. {!canModerate && <span className="text-amber-600">Requires Personal or Company plan.</span>}</div>
               </div>
               <button
                 onClick={() => canModerate && setModerated((v) => !v)}

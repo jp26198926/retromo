@@ -51,7 +51,7 @@ const enhanced = [
   },
   {
     title: "Improved privacy and security",
-    body: "Regular team retros, private invite-only retros, and encrypted ad-hoc retros for top-tier security.",
+    body: "Regular team retros, private sign-in-only retros, and encrypted ad-hoc retros for top-tier security.",
   },
 ];
 
