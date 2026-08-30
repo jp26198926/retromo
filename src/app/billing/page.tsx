@@ -30,6 +30,7 @@ type SubscriptionData = {
   subscriptionCurrentPeriodEnd: string | null;
   subscriptionCancelledAt: string | null;
   hasActiveAccess: boolean;
+  isAdminOverride?: boolean;
   billingHistory: BillingHistoryItem[];
 };
 
@@ -106,7 +107,9 @@ export default function BillingPage() {
     );
   }
 
-  const planLabel = sub?.subscriptionPlan === "individual" ? "Individual" :
+  const isAdminOverride = !!sub?.isAdminOverride;
+  const planLabel = isAdminOverride ? "Company (Admin)" :
+                    sub?.subscriptionPlan === "individual" ? "Individual" :
                     sub?.subscriptionPlan === "company" ? "Company" : "Anonymous (Free)";
   const isActive = sub?.subscriptionStatus === "active";
   const isCancelled = sub?.subscriptionStatus === "cancelled";
@@ -142,14 +145,26 @@ export default function BillingPage() {
               <span
                 className={cn(
                   "rounded-full px-3 py-1 text-xs font-semibold",
+                  isAdminOverride ? "bg-purple-100 text-purple-700" :
                   isActive ? "bg-green-100 text-green-700" :
                   isCancelled ? "bg-amber-100 text-amber-700" :
                   "bg-neutral-100 text-neutral-600"
                 )}
               >
-                {isActive ? "Active" : isCancelled ? "Cancelled" : sub?.subscriptionStatus || "Free"}
+                {isAdminOverride ? "Full access" :
+                 isActive ? "Active" : isCancelled ? "Cancelled" : sub?.subscriptionStatus || "Free"}
               </span>
             </div>
+
+            {isAdminOverride && (
+              <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-800">
+                You are a platform administrator, so you have full access to every
+                feature — equivalent to the Company plan — without a subscription.
+                {sub?.subscriptionPlan && sub.subscriptionPlan !== "anonymous" && (
+                  <> Your actual subscription is <span className="font-semibold capitalize">{sub.subscriptionPlan}</span>.</>
+                )}
+              </div>
+            )}
 
             {hasAccess && periodEnd && (
               <div className="mt-4 border-t border-neutral-100 pt-4">
@@ -177,7 +192,11 @@ export default function BillingPage() {
 
             {/* Actions */}
             <div className="mt-6 flex flex-wrap gap-3">
-              {(sub?.subscriptionPlan === "anonymous" || !hasAccess) ? (
+              {isAdminOverride && sub?.subscriptionPlan === "anonymous" ? (
+                <p className="text-sm text-neutral-500">
+                  No subscription is required for your account.
+                </p>
+              ) : (sub?.subscriptionPlan === "anonymous" || !hasAccess) ? (
                 <Button variant="primary" onClick={() => setShowUpgradeModal(true)}>
                   Upgrade your plan
                 </Button>

@@ -4,6 +4,7 @@ import { retros, columns, cards, votes, actionPoints, retroParticipants } from "
 import { eq, and } from "drizzle-orm";
 import { getSession } from "@/lib/session";
 import { getCurrentUserPlan, hasActiveAccess } from "@/lib/plans";
+import { isAdmin } from "@/lib/admin";
 
 export async function GET(
   req: NextRequest,
@@ -106,12 +107,14 @@ export async function PATCH(
     const retro = await db.query.retros.findFirst({ where: eq(retros.id, id) });
     if (!retro) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    // Only the owner can archive/unarchive
-    if (retro.ownerId !== session.user.id) {
+    // Only the owner (or a platform admin) can archive/unarchive
+    const admin = await isAdmin();
+    if (retro.ownerId !== session.user.id && !admin) {
       return NextResponse.json({ error: "Only the retro owner can archive or unarchive" }, { status: 403 });
     }
 
-    // Archiving requires a paid plan (infinite archive feature)
+    // Archiving requires a paid plan (infinite archive feature).
+    // Admins are resolved to the Company plan, so this passes for them.
     const plan = await getCurrentUserPlan();
     const hasPaidAccess = hasActiveAccess(plan) && plan.plan !== "anonymous";
     if (!hasPaidAccess) {

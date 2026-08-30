@@ -6,6 +6,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/Button";
 import { useSession } from "@/lib/auth-client";
+import { useAdmin } from "@/components/useAdmin";
 import { cn } from "@/lib/utils";
 
 interface RetroHistoryItem {
@@ -37,6 +38,7 @@ type SortDir = "asc" | "desc";
 
 export default function RetroHistoryPage() {
   const { data: session, isPending } = useSession();
+  const { isAdmin } = useAdmin();
 
   const [items, setItems] = useState<RetroHistoryItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -389,7 +391,7 @@ export default function RetroHistoryPage() {
                             <Link href={`/retro/${item.id}`}>
                               <Button size="sm" variant="outline">Open</Button>
                             </Link>
-                            {item.isOwner && item.plan !== "anonymous" && (
+                            {(isAdmin || (item.isOwner && item.plan !== "anonymous")) && (
                               <Button
                                 size="sm"
                                 variant="ghost"

@@ -3,6 +3,9 @@ import { user } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/session";
 import { getAppSettings } from "@/lib/app-settings";
+// Only the pure email helper is imported here — importing the DB-backed
+// isAdmin() would create a circular dependency via getSession().
+import { isAdminEmail } from "@/lib/admin";
 
 export type PlanKey = "anonymous" | "individual" | "company";
 
@@ -11,6 +14,12 @@ export type PlanFeatures = {
   status: string; // none | active | cancelled | past_due
   isActive: boolean;
   currentPeriodEnd: Date | null;
+  /**
+   * True when this feature set was granted because the user is a platform
+   * admin rather than because they hold a paid subscription. Useful for the
+   * UI so it can say "full access (admin)" instead of showing billing state.
+   */
+  isAdminOverride?: boolean;
   // feature flags
   maxTeams: number; // 0 = none, -1 = unlimited
   maxColumns: number; // -1 = unlimited
@@ -96,6 +105,22 @@ export async function getCurrentUserPlan(): Promise<PlanFeatures> {
   }
 
   const u = await db.query.user.findFirst({ where: eq(user.id, session.user.id) });
+
+  // Platform admins get full access to every feature, equivalent to the
+  // Company plan, regardless of their actual subscription. This is checked
+  // before anything else so it also applies to admins identified purely by
+  // the ADMIN_EMAIL env var (who may not have a user row yet).
+  if (isAdminEmail(session.user.email) || u?.role === "admin") {
+    return {
+      ...COMPANY_FEATURES,
+      plan: "company",
+      status: u?.subscriptionStatus ?? "none",
+      isActive: true,
+      currentPeriodEnd: u?.subscriptionCurrentPeriodEnd ?? null,
+      isAdminOverride: true,
+    };
+  }
+
   if (!u) {
     return {
       ...ANONYMOUS_FEATURES,
@@ -131,6 +156,8 @@ export async function getCurrentUserPlan(): Promise<PlanFeatures> {
  * Cancelled plans keep access until subscriptionCurrentPeriodEnd.
  */
 export function hasActiveAccess(features: PlanFeatures): boolean {
+  // Admins always have access, regardless of subscription state.
+  if (features.isAdminOverride) return true;
   if (features.isActive) return true;
   if (features.status === "cancelled" && features.currentPeriodEnd) {
     return new Date(features.currentPeriodEnd) > new Date();

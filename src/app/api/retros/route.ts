@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
     // Determine the effective plan for this retro based on the creator's subscription.
     // Anonymous (not-logged-in) users and free users get the "anonymous" plan retro.
     // Paid users with active access get their plan's features.
+    // Platform admins are resolved to the Company plan by getCurrentUserPlan().
     let retroPlan: "anonymous" | "individual" | "company" = "anonymous";
     let privateRetrosAllowed = false;
     let advancedFacilitation = false;

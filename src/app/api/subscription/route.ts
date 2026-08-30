@@ -4,6 +4,7 @@ import { user, billingHistory } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getSession } from "@/lib/session";
 import { hasActiveAccess, getPlanFeatures } from "@/lib/plans";
+import { isAdmin } from "@/lib/admin";
 
 // Get current user's subscription status + billing history
 export async function GET() {
@@ -35,9 +36,14 @@ export async function GET() {
     const periodEnd = u.subscriptionCurrentPeriodEnd
       ? new Date(u.subscriptionCurrentPeriodEnd)
       : null;
+
+    // Platform admins get full Company-plan access regardless of subscription.
+    const admin = await isAdmin();
+
     // If cancelled and period has expired, the effective plan is anonymous
-    const effectivePlanKey =
-      isCancelled && periodEnd && periodEnd < new Date()
+    const effectivePlanKey = admin
+      ? "company"
+      : isCancelled && periodEnd && periodEnd < new Date()
         ? "anonymous"
         : u.subscriptionPlan;
     // The effective features reflect the effective plan
@@ -50,15 +56,19 @@ export async function GET() {
       paypalSubscriptionId: u.paypalSubscriptionId,
       subscriptionCurrentPeriodEnd: u.subscriptionCurrentPeriodEnd,
       subscriptionCancelledAt: u.subscriptionCancelledAt,
-      hasActiveAccess: activeAccess,
+      hasActiveAccess: admin || activeAccess,
+      // True when the full access above comes from being a platform admin
+      // rather than from a paid subscription.
+      isAdminOverride: admin,
       // Full plan feature set for the effective plan (used by the setup wizard
       // and other UI to know which features to show)
       plan: {
         ...effectiveFeatures,
         plan: effectivePlanKey,
         status: u.subscriptionStatus,
-        isActive: activeAccess,
+        isActive: admin || activeAccess,
         currentPeriodEnd: u.subscriptionCurrentPeriodEnd,
+        isAdminOverride: admin,
       },
       billingHistory: history.map((h) => ({
         id: h.id,

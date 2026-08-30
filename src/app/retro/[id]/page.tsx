@@ -285,7 +285,8 @@ export default function RetroBoardPage() {
   // Only the host or an admin can access the timer and lock controls.
   const isHost = !!(isLoggedIn && state?.retro?.ownerId && state.retro.ownerId === sessionData?.user?.id);
   const canControl = isHost || isAdmin;
-  const canExport = !!state?.retro?.plan && state.retro.plan !== "anonymous";
+  // Export is a paid feature, but platform admins can always export.
+  const canExport = isAdmin || (!!state?.retro?.plan && state.retro.plan !== "anonymous");
 
   // Auto-lock: when the timer was running and has expired, automatically lock the board.
   // We use a ref to avoid calling the lock API multiple times.

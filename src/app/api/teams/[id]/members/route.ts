@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { sendTeamInvitationEmail, isEmailConfigured } from "@/lib/email";
 import { getAppSettings } from "@/lib/app-settings";
 import { getCurrentUserPlan, hasActiveAccess } from "@/lib/plans";
+import { isAdmin } from "@/lib/admin";
 
 // POST — add a member to a team (by email). Owner only.
 // If the user already has an account, they're added directly.
@@ -22,10 +23,11 @@ export async function POST(
     }
     const { id } = await params;
 
+    const admin = await isAdmin();
     const member = await db.query.teamMembers.findFirst({
       where: and(eq(teamMembers.teamId, id), eq(teamMembers.userId, session.user.id)),
     });
-    if (!member || member.role !== "owner") {
+    if ((!member || member.role !== "owner") && !admin) {
       return NextResponse.json({ error: "Only the team owner can add members" }, { status: 403 });
     }
 
@@ -163,7 +165,8 @@ export async function DELETE(
       where: and(eq(teamMembers.teamId, id), eq(teamMembers.userId, session.user.id)),
     });
 
-    if (!myMember || myMember.role !== "owner") {
+    const admin = await isAdmin();
+    if ((!myMember || myMember.role !== "owner") && !admin) {
       return NextResponse.json({ error: "Only the team owner can remove members" }, { status: 403 });
     }
 
@@ -208,11 +211,12 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
 
-    // Only the team owner can change roles
+    // Only the team owner (or a platform admin) can change roles
+    const admin = await isAdmin();
     const myMember = await db.query.teamMembers.findFirst({
       where: and(eq(teamMembers.teamId, id), eq(teamMembers.userId, session.user.id)),
     });
-    if (!myMember || myMember.role !== "owner") {
+    if ((!myMember || myMember.role !== "owner") && !admin) {
       return NextResponse.json({ error: "Only the team owner can change member roles" }, { status: 403 });
     }
 
@@ -227,7 +231,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Cannot change the owner's role" }, { status: 400 });
     }
 
-    // Scrum Master and Team Lead roles require the Company plan
+    // Scrum Master and Team Lead roles require the Company plan.
+    // Admins are resolved to the Company plan, so this passes for them.
     if (role === "scrumMaster" || role === "teamLead") {
       const plan = await getCurrentUserPlan();
       if (!hasActiveAccess(plan) || plan.plan !== "company") {

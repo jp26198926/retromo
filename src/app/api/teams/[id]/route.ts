@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { teams, teamMembers, retros, actionPoints, teamInvitations } from "@/db/schema";
 import { getSession } from "@/lib/session";
+import { isAdmin } from "@/lib/admin";
 import { eq, and } from "drizzle-orm";
 
 // GET — team detail with members, retros, action points
@@ -107,7 +108,8 @@ export async function PATCH(
     const member = await db.query.teamMembers.findFirst({
       where: and(eq(teamMembers.teamId, id), eq(teamMembers.userId, session.user.id)),
     });
-    if (!member || member.role !== "owner") {
+    const admin = await isAdmin();
+    if ((!member || member.role !== "owner") && !admin) {
       return NextResponse.json({ error: "Only the team owner can update the team" }, { status: 403 });
     }
 
@@ -144,7 +146,8 @@ export async function DELETE(
     const member = await db.query.teamMembers.findFirst({
       where: and(eq(teamMembers.teamId, id), eq(teamMembers.userId, session.user.id)),
     });
-    if (!member || member.role !== "owner") {
+    const admin = await isAdmin();
+    if ((!member || member.role !== "owner") && !admin) {
       return NextResponse.json({ error: "Only the team owner can delete the team" }, { status: 403 });
     }
 

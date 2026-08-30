@@ -375,9 +375,28 @@ Gating is applied on the **server** (authoritative) and mirrored in the **UI** (
 | Private retros            | `POST /api/retros` rejects `visibility: "private"` without `privateRetros`                             | Toggle disabled with an upgrade hint                                                         |
 | Moderation                | `POST /api/cards/moderation` verifies the retro is moderated and the caller is owner/facilitator/admin | Moderation panel only rendered for facilitators on moderated retros                          |
 | Configurable retention    | `POST /api/retros` forces 365 days for anonymous; validates 1–3650 (or 0/-1 = forever) for paid        | Dropdown disabled with _"Upgrade to configure"_                                              |
-| Archive / unarchive       | `PATCH /api/retros/[id]` requires ownership and a paid plan                                            | Archive button only shown to owners of paid retros                                           |
+| Archive / unarchive       | `PATCH /api/retros/[id]` requires ownership (or admin) and a paid plan                                | Archive button shown to owners of paid retros and to admins                                  |
 | Scrum Master / Team Lead  | `PATCH /api/teams/[id]/members` requires the Company plan for those roles                              | Role options disabled for non-Company plans                                                  |
 | Zero-knowledge encryption | `POST /api/retros` rejects `encryptionEnabled` without the Company plan                                | Toggle + password fields only enabled on Company plan                                        |
+
+### Admin full access
+
+Platform admins (identified by `ADMIN_EMAIL` or `user.role === "admin"` in the database) automatically receive the **full Company-plan feature set**, regardless of their subscription. This is resolved centrally in `getCurrentUserPlan()` so it flows through every plan-gated check without per-route special-casing:
+
+- `getCurrentUserPlan()` returns the Company features with `isActive: true` and an `isAdminOverride: true` flag before any subscription lookup.
+- `hasActiveAccess()` short-circuits to `true` when `isAdminOverride` is set.
+- The `/api/subscription` endpoint reports `effectivePlan: "company"`, `hasActiveAccess: true`, and `isAdminOverride: true` for admins, so the UI (team creation, role dropdowns, export buttons, billing page, setup wizard) enables all Company features automatically.
+
+Admins can additionally manage resources they do not own — the following ownership checks include an explicit `isAdmin()` bypass:
+
+| Operation                         | Endpoint                              |
+| --------------------------------- | ------------------------------------- |
+| Archive / unarchive any retro     | `PATCH /api/retros/[id]`              |
+| Update / delete any team          | `PATCH`, `DELETE /api/teams/[id]`     |
+| Add / remove members on any team  | `POST`, `DELETE /api/teams/[id]/members` |
+| Change member roles on any team   | `PATCH /api/teams/[id]/members`       |
+
+The real `subscriptionPlan` and `subscriptionStatus` are preserved on the billing page so an admin who also holds a paid subscription still sees accurate billing information; the admin override only affects **feature access**, displayed as a purple _"Full access"_ badge with a _"Company (Admin)"_ plan label.
 
 ### Zero-knowledge encryption
 
