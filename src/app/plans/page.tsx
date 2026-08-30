@@ -19,8 +19,8 @@ export default function PlansPage() {
       period: "forever",
       features: [
         "Quick and easy to start — no account needed",
-        "Up to 3 cards per retrospective",
-        "Unlimited columns and action points",
+        "Up to 3 columns per retrospective",
+        "Unlimited cards and action points",
         `Up to ${settings.anonymousParticipantLimit} participants per retro`,
         "Basic facilitation tools",
         "Stored for 12 months (fixed retention)",
@@ -36,7 +36,7 @@ export default function PlansPage() {
       period: "per month",
       features: [
         "Everything from Anonymous, and:",
-        "Unlimited cards per retrospective",
+        "Unlimited columns per retrospective",
         "Data export to Markdown",
         "Private, invite-only retrospectives",
         "Card moderation — approve or reject before they go public",

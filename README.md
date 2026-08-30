@@ -63,8 +63,9 @@ Three subscription tiers with plan-based feature gating. Payments are processed 
 #### Anonymous (Free)
 
 - No account needed — start a retro instantly
-- **Up to 3 cards per retrospective** (enforced server-side; further cards return `403`)
-- Unlimited columns and action points
+- **Up to 3 columns per retrospective** (enforced server-side at retro creation; more columns return `403`)
+- Unlimited cards and action points
+- All four built-in templates use three columns, so every template works on the free plan
 - Configurable participant limit (admin-set, default 50)
 - Basic facilitation tools (lock, secret voting, timer)
 - Retros retained for 12 months (365 days, fixed — not configurable)
@@ -75,7 +76,7 @@ Three subscription tiers with plan-based feature gating. Payments are processed 
 
 Everything from Anonymous, plus:
 
-- **Unlimited cards per retrospective** — the 3-card free cap is lifted
+- **Unlimited columns per retrospective** — the 3-column free cap is lifted
 - **Data export to Markdown** — export button appears on the board
 - **Private, invite-only retrospectives** — restrict access to invited participants
 - **Card moderation** — cards start as _pending_ and require facilitator approval before appearing publicly
@@ -100,8 +101,8 @@ Everything from Individual, plus:
 
 | Feature                                         |    Anonymous     |  Individual  |   Company    |
 | ----------------------------------------------- | :--------------: | :----------: | :----------: |
-| Cards per retro                                 |        3         |  Unlimited   |  Unlimited   |
-| Columns & action points                         |    Unlimited     |  Unlimited   |  Unlimited   |
+| Columns per retro                               |        3         |  Unlimited   |  Unlimited   |
+| Cards & action points                           |    Unlimited     |  Unlimited   |  Unlimited   |
 | Participants per retro                          |  50 (admin-set)  |  Unlimited   |  Unlimited   |
 | Basic facilitation (lock, timer, secret voting) |        ✅        |      ✅      |      ✅      |
 | Markdown export                                 |        ❌        |      ✅      |      ✅      |
@@ -351,6 +352,7 @@ Feature access is controlled by `src/lib/plans.ts`, which defines feature flags 
 | Feature flag                        | Anonymous                       | Individual | Company          |
 | ----------------------------------- | ------------------------------- | ---------- | ---------------- |
 | `maxTeams`                          | 0                               | 3          | Unlimited (`-1`) |
+| `maxColumns`                        | 3                               | Unlimited (`-1`) | Unlimited (`-1`) |
 | `participantLimit`                  | Admin-configurable (default 50) | Unlimited  | Unlimited        |
 | `privateRetros`                     | —                               | ✅         | ✅               |
 | `advancedFacilitation` (moderation) | —                               | ✅         | ✅               |
@@ -368,7 +370,7 @@ Gating is applied on the **server** (authoritative) and mirrored in the **UI** (
 
 | Restriction               | Server enforcement                                                                                     | UI behaviour                                                                                 |
 | ------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| 3-card cap on free plan   | `POST /api/cards` counts existing cards and returns `403` for `anonymous` retros at 3                  | Error toast: _"The free plan is limited to 3 cards per retrospective. Upgrade to add more."_ |
+| 3-column cap on free plan | `POST /api/retros` compares `columns.length` against `maxColumns` and returns `403` before touching the database                | "+ Add column" is disabled at the cap, with a _"3 of 3 columns used on the free plan"_ hint and an upgrade link |
 | Markdown export           | —                                                                                                      | Export button hidden unless `retro.plan !== "anonymous"`                                     |
 | Private retros            | `POST /api/retros` rejects `visibility: "private"` without `privateRetros`                             | Toggle disabled with an upgrade hint                                                         |
 | Moderation                | `POST /api/cards/moderation` verifies the retro is moderated and the caller is owner/facilitator/admin | Moderation panel only rendered for facilitators on moderated retros                          |

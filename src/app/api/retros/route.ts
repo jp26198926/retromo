@@ -4,7 +4,7 @@ import { retros, columns, retroParticipants } from "@/db/schema";
 import { getSession } from "@/lib/session";
 import { generateShareToken, randomColor, randomDisplayName } from "@/lib/utils";
 import { eq } from "drizzle-orm";
-import { getCurrentUserPlan, hasActiveAccess } from "@/lib/plans";
+import { getCurrentUserPlan, getPlanFeatures, hasActiveAccess } from "@/lib/plans";
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
     let advancedFacilitation = false;
     let configurableRetention = false;
     let zeroKnowledgeEncryption = false;
+    let maxColumns = getPlanFeatures("anonymous").maxColumns;
 
     if (session?.user) {
       const plan = await getCurrentUserPlan();
@@ -49,7 +50,19 @@ export async function POST(req: NextRequest) {
         advancedFacilitation = plan.advancedFacilitation;
         configurableRetention = plan.configurableRetention;
         zeroKnowledgeEncryption = plan.zeroKnowledgeEncryption;
+        maxColumns = plan.maxColumns;
       }
+    }
+
+    // Enforce the column limit — the free plan is capped at 3 columns per retro.
+    // maxColumns === -1 means unlimited.
+    if (maxColumns !== -1 && cols.length > maxColumns) {
+      return NextResponse.json(
+        {
+          error: `The free plan is limited to ${maxColumns} columns per retrospective. Upgrade to add more.`,
+        },
+        { status: 403 }
+      );
     }
 
     // Enforce private retros — only Individual/Company plans can create private retros

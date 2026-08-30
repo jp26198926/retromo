@@ -54,7 +54,7 @@ export function UpgradePlanModal({ open, currentPlan, onCancel, onSuccess }: Upg
       price: loaded ? `$${settings.individualPrice}` : "$10",
       amount: settings.individualPrice,
       features: [
-        "Unlimited cards per retrospective",
+        "Unlimited columns per retrospective",
         "Data export to Markdown",
         "Private, invite-only retrospectives",
         "Card moderation (approve / reject)",

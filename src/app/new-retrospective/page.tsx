@@ -51,6 +51,7 @@ function NewRetroForm() {
     advancedFacilitation: boolean;
     configurableRetention: boolean;
     zeroKnowledgeEncryption: boolean;
+    maxColumns: number;
   } | null>(null);
 
   useEffect(() => {
@@ -66,6 +67,7 @@ function NewRetroForm() {
               advancedFacilitation: data.plan.advancedFacilitation,
               configurableRetention: data.plan.configurableRetention,
               zeroKnowledgeEncryption: data.plan.zeroKnowledgeEncryption,
+              maxColumns: data.plan.maxColumns ?? 3,
             });
           }
         }
@@ -80,6 +82,11 @@ function NewRetroForm() {
   const canModerate = planFeatures?.advancedFacilitation ?? false;
   const canRetention = planFeatures?.configurableRetention ?? false;
   const canEncrypt = planFeatures?.zeroKnowledgeEncryption ?? false;
+  // -1 = unlimited. Until the plan loads, assume the free-plan cap so we never
+  // let a free user build a board the API will reject.
+  const maxColumns = planFeatures?.maxColumns ?? 3;
+  const columnsUnlimited = maxColumns === -1;
+  const atColumnLimit = !columnsUnlimited && columns.length >= maxColumns;
 
   function selectTemplate(id: string) {
     setTemplateId(id);
@@ -91,7 +98,10 @@ function NewRetroForm() {
     setColumns((cols) => cols.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
   }
   function addColumn() {
-    setColumns((cols) => [...cols, { name: `Column ${cols.length + 1}`, description: "", color: "#a78bfa" }]);
+    setColumns((cols) => {
+      if (!columnsUnlimited && cols.length >= maxColumns) return cols;
+      return [...cols, { name: `Column ${cols.length + 1}`, description: "", color: "#a78bfa" }];
+    });
   }
   function removeColumn(i: number) {
     setColumns((cols) => cols.filter((_, idx) => idx !== i));
@@ -387,16 +397,35 @@ function NewRetroForm() {
 
             {!isPaid && (
               <div className="mt-4 rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-500">
-                You're on the free plan. <Link href="/plans" className="font-medium text-indigo-600 hover:underline">Upgrade</Link> to unlock private retros, moderation, data retention, and encryption.
+                You&apos;re on the free plan. <Link href="/plans" className="font-medium text-indigo-600 hover:underline">Upgrade</Link> to unlock unlimited columns, private retros, moderation, data retention, and encryption.
               </div>
             )}
           </section>
 
           {/* Columns */}
           <section className="mb-10 rounded-2xl border border-neutral-200 bg-white p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-neutral-900">Columns</h2>
-              <Button size="sm" variant="outline" onClick={addColumn}>+ Add column</Button>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-neutral-900">Columns</h2>
+                {!columnsUnlimited && (
+                  <p className="mt-0.5 text-xs text-neutral-500">
+                    {columns.length} of {maxColumns} columns used on the free plan.{" "}
+                    <Link href="/plans" className="font-medium text-indigo-600 hover:underline">
+                      Upgrade
+                    </Link>{" "}
+                    for unlimited columns.
+                  </p>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={addColumn}
+                disabled={atColumnLimit}
+                title={atColumnLimit ? `The free plan is limited to ${maxColumns} columns.` : undefined}
+              >
+                + Add column
+              </Button>
             </div>
             <div className="space-y-3">
               {columns.map((c, i) => (

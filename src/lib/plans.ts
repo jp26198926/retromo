@@ -13,6 +13,7 @@ export type PlanFeatures = {
   currentPeriodEnd: Date | null;
   // feature flags
   maxTeams: number; // 0 = none, -1 = unlimited
+  maxColumns: number; // -1 = unlimited
   participantLimit: number; // 0 = unlimited
   privateRetros: boolean;
   advancedFacilitation: boolean; // secret voting, timer, moderation
@@ -25,6 +26,7 @@ export type PlanFeatures = {
 
 const ANONYMOUS_FEATURES: Omit<PlanFeatures, "plan" | "status" | "isActive" | "currentPeriodEnd"> = {
   maxTeams: 0,
+  maxColumns: 3, // free plan is capped at 3 columns per retro
   participantLimit: 50, // default; overridden by app settings at runtime
   privateRetros: false,
   advancedFacilitation: false,
@@ -37,6 +39,7 @@ const ANONYMOUS_FEATURES: Omit<PlanFeatures, "plan" | "status" | "isActive" | "c
 
 const INDIVIDUAL_FEATURES: Omit<PlanFeatures, "plan" | "status" | "isActive" | "currentPeriodEnd"> = {
   maxTeams: 3,
+  maxColumns: -1, // unlimited
   participantLimit: 0, // unlimited
   privateRetros: true,
   advancedFacilitation: true,
@@ -49,6 +52,7 @@ const INDIVIDUAL_FEATURES: Omit<PlanFeatures, "plan" | "status" | "isActive" | "
 
 const COMPANY_FEATURES: Omit<PlanFeatures, "plan" | "status" | "isActive" | "currentPeriodEnd"> = {
   maxTeams: -1, // unlimited
+  maxColumns: -1, // unlimited
   participantLimit: 0,
   privateRetros: true,
   advancedFacilitation: true,
