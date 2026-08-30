@@ -71,9 +71,12 @@ export default function PlansPage() {
       <Navbar />
       <main className="flex-1">
         <section className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6">
-          <h1 className="text-4xl font-extrabold tracking-tight text-neutral-900 sm:text-5xl">Find the perfect plan for you</h1>
+          <h1 className="text-4xl font-extrabold tracking-tight text-neutral-900 sm:text-5xl">
+            Find the perfect plan for you
+          </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-neutral-600">
-            You can stay anonymous if this is your jam, but you should try our paid plans to get even more goodies!
+            You can stay anonymous if this is your jam, but you should try our
+            paid plans to get even more goodies!
           </p>
         </section>
 
@@ -83,14 +86,9 @@ export default function PlansPage() {
               <PlanCard key={p.name} {...p} />
             ))}
           </div>
-          <p className="mt-6 text-center text-sm text-neutral-500">Pay securely with PayPal. Recurring monthly — cancel anytime.</p>
-        </section>
-
-        <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
-          <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-8 text-center">
-            <p className="text-lg font-medium text-neutral-700">&ldquo;We must use time as a tool, not as a couch.&rdquo;</p>
-            <p className="mt-2 text-sm text-neutral-500">— John F. Kennedy</p>
-          </div>
+          <p className="mt-6 text-center text-sm text-neutral-500">
+            Pay securely with PayPal. Recurring monthly — cancel anytime.
+          </p>
         </section>
       </main>
       <Footer />

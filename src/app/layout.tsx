@@ -29,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const appName = settings?.appName || "RetroMo";
   const appDescription =
     settings?.appDescription ||
-    "RetroMo is the easiest to use tool for running engaging online retrospectives for your remote or hybrid teams.";
+    "RetroMore is the easiest to use tool for running engaging online retrospectives for your remote or hybrid teams.";
   const faviconUrl = settings?.faviconUrl || undefined;
   const iconUrl = settings?.appIconUrl || undefined;
 
