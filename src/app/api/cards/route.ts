@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { cards, columns, retroParticipants } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { cards, columns, retroParticipants, retros } from "@/db/schema";
+import { eq, and, count } from "drizzle-orm";
 import { getSession } from "@/lib/session";
 import { CARD_COLOR_KEYS } from "@/lib/card-colors";
 
@@ -17,6 +17,23 @@ export async function POST(req: NextRequest) {
 
     const col = await db.query.columns.findFirst({ where: eq(columns.id, columnId) });
     if (!col) return NextResponse.json({ error: "Column not found" }, { status: 404 });
+
+    // Anonymous-plan retros are limited to 3 cards total.
+    const retro = await db.query.retros.findFirst({ where: eq(retros.id, retroId) });
+    if (!retro) return NextResponse.json({ error: "Retro not found" }, { status: 404 });
+    if (retro.plan === "anonymous") {
+      const [row] = await db
+        .select({ n: count() })
+        .from(cards)
+        .where(eq(cards.retroId, retroId));
+      const existing = Number(row?.n ?? 0);
+      if (existing >= 3) {
+        return NextResponse.json(
+          { error: "The free plan is limited to 3 cards per retrospective. Upgrade to add more." },
+          { status: 403 }
+        );
+      }
+    }
 
     // Determine author name and card color
     let resolvedAuthorName = session?.user?.name || authorName || null;
@@ -54,6 +71,8 @@ export async function POST(req: NextRequest) {
         authorName: resolvedAuthorName,
         authorParticipantId: resolvedAuthorParticipantId,
         isPublic,
+        // In moderated retros, new cards start as pending (not approved)
+        approved: !retro.moderated,
         position: 0,
       })
       .returning();

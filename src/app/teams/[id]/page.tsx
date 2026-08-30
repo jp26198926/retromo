@@ -63,6 +63,43 @@ export default function TeamDetailPage() {
   const [removeMember, setRemoveMember] = useState<{ userId: string; name: string } | null>(null);
   const [removingMember, setRemovingMember] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [userPlan, setUserPlan] = useState<string>("anonymous");
+  const [roleChangeMsg, setRoleChangeMsg] = useState<string | null>(null);
+
+  // Fetch the user's plan to determine if Scrum Master / Team Lead roles are available
+  useEffect(() => {
+    fetch("/api/subscription")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.effectivePlan) setUserPlan(d.effectivePlan);
+      })
+      .catch(() => {});
+  }, []);
+
+  const isCompanyPlan = userPlan === "company";
+
+  const handleRoleChange = async (userId: string, role: string) => {
+    setRoleChangeMsg(null);
+    const res = await fetch(`/api/teams/${params.id}/members`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, role }),
+    });
+    const d = await res.json();
+    if (res.ok) {
+      load();
+    } else {
+      setRoleChangeMsg(d.error || "Failed to update role");
+      setTimeout(() => setRoleChangeMsg(null), 4000);
+    }
+  };
+
+  const roleLabels: Record<string, string> = {
+    owner: "Owner",
+    member: "Member",
+    scrumMaster: "Scrum Master",
+    teamLead: "Team Lead",
+  };
 
   const load = () => {
     fetch(`/api/teams/${params.id}`)
@@ -260,6 +297,9 @@ export default function TeamDetailPage() {
               )}
 
               <ul className="mt-4 space-y-2">
+                {roleChangeMsg && (
+                  <li className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{roleChangeMsg}</li>
+                )}
                 {data.members.map((m) => (
                   <li
                     key={m.id}
@@ -277,6 +317,31 @@ export default function TeamDetailPage() {
                     <div className="flex items-center gap-2">
                       {m.role === "owner" && (
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Owner</span>
+                      )}
+                      {m.role === "scrumMaster" && (
+                        <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">Scrum Master</span>
+                      )}
+                      {m.role === "teamLead" && (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">Team Lead</span>
+                      )}
+                      {m.role === "member" && (
+                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">Member</span>
+                      )}
+                      {isOwner && m.role !== "owner" && (
+                        <select
+                          value={m.role}
+                          onChange={(e) => handleRoleChange(m.user.id, e.target.value)}
+                          className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs text-neutral-700"
+                          title="Change role"
+                        >
+                          <option value="member">Member</option>
+                          <option value="scrumMaster" disabled={!isCompanyPlan}>
+                            Scrum Master{!isCompanyPlan ? " (Company plan)" : ""}
+                          </option>
+                          <option value="teamLead" disabled={!isCompanyPlan}>
+                            Team Lead{!isCompanyPlan ? " (Company plan)" : ""}
+                          </option>
+                        </select>
                       )}
                       {isOwner && m.role !== "owner" && (
                         <button

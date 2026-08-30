@@ -19,6 +19,10 @@ export type RetroState = {
     plan: string;
     shareToken: string;
     ownerId: string | null;
+    visibility: "regular" | "private";
+    archived: boolean;
+    retentionDays: number | null;
+    encryptionEnabled: boolean;
   };
   columns: { id: string; name: string; description: string | null; color: string; imageUrl: string | null; position: number }[];
   cards: CardData[];

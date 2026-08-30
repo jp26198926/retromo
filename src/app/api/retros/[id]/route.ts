@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { retros, columns, cards, votes, actionPoints, retroParticipants } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession } from "@/lib/session";
+import { getCurrentUserPlan, hasActiveAccess } from "@/lib/plans";
 
 export async function GET(
   req: NextRequest,
@@ -80,4 +81,55 @@ export async function GET(
     currentUserId,
     currentParticipant,
   });
+}
+
+// PATCH — toggle archived status on a retro.
+// Only the retro owner can archive/unarchive. Archiving is a paid feature
+// (infinite archive is available on Individual and Company plans).
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSession();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const { id } = await params;
+    const body = await req.json();
+    const { archived } = body;
+
+    if (typeof archived !== "boolean") {
+      return NextResponse.json({ error: "archived (boolean) is required" }, { status: 400 });
+    }
+
+    const retro = await db.query.retros.findFirst({ where: eq(retros.id, id) });
+    if (!retro) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    // Only the owner can archive/unarchive
+    if (retro.ownerId !== session.user.id) {
+      return NextResponse.json({ error: "Only the retro owner can archive or unarchive" }, { status: 403 });
+    }
+
+    // Archiving requires a paid plan (infinite archive feature)
+    const plan = await getCurrentUserPlan();
+    const hasPaidAccess = hasActiveAccess(plan) && plan.plan !== "anonymous";
+    if (!hasPaidAccess) {
+      return NextResponse.json(
+        { error: "Archiving retrospectives is available on the Personal and Company plans." },
+        { status: 403 }
+      );
+    }
+
+    const [updated] = await db
+      .update(retros)
+      .set({ archived, updatedAt: new Date() })
+      .where(eq(retros.id, id))
+      .returning();
+
+    return NextResponse.json({ ok: true, archived: updated.archived });
+  } catch (e) {
+    console.error("[PATCH /api/retros/[id]]", e);
+    return NextResponse.json({ error: "Failed to update retro" }, { status: 500 });
+  }
 }

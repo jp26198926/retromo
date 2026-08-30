@@ -14,6 +14,7 @@ export type CardData = {
   imageUrl: string | null;
   color: string;
   isPublic: boolean;
+  approved: boolean;
   position: number;
   votesCount: number;
   votes: { id: string; voterId: string | null; voterName: string | null }[];
@@ -87,6 +88,13 @@ export function Card({
       )}
 
       <p className="whitespace-pre-wrap break-words text-neutral-800">{card.content}</p>
+
+      {/* Pending badge for moderated retros */}
+      {!card.approved && (
+        <div className="mt-1 mb-1">
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">Pending review</span>
+        </div>
+      )}
 
       {/* Footer: author + votes */}
       <div className="mt-2 flex items-center justify-between">

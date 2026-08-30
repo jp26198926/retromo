@@ -5,6 +5,7 @@ import { getSession } from "@/lib/session";
 import { eq, and } from "drizzle-orm";
 import { sendTeamInvitationEmail, isEmailConfigured } from "@/lib/email";
 import { getAppSettings } from "@/lib/app-settings";
+import { getCurrentUserPlan, hasActiveAccess } from "@/lib/plans";
 
 // POST — add a member to a team (by email). Owner only.
 // If the user already has an account, they're added directly.
@@ -179,5 +180,73 @@ export async function DELETE(
   } catch (e) {
     console.error("[DELETE /api/teams/[id]/members]", e);
     return NextResponse.json({ error: "Failed to remove member" }, { status: 500 });
+  }
+}
+
+// PATCH — change a member's role (e.g. assign Scrum Master / Team Lead).
+// Only the team owner can change roles. Scrum Master and Team Lead roles
+// require the Company plan.
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSession();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const { id } = await params;
+    const body = await req.json();
+    const { userId: targetUserId, role } = body;
+
+    if (!targetUserId || !role) {
+      return NextResponse.json({ error: "userId and role are required" }, { status: 400 });
+    }
+
+    const validRoles = ["owner", "member", "scrumMaster", "teamLead"];
+    if (!validRoles.includes(role)) {
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+
+    // Only the team owner can change roles
+    const myMember = await db.query.teamMembers.findFirst({
+      where: and(eq(teamMembers.teamId, id), eq(teamMembers.userId, session.user.id)),
+    });
+    if (!myMember || myMember.role !== "owner") {
+      return NextResponse.json({ error: "Only the team owner can change member roles" }, { status: 403 });
+    }
+
+    // Prevent changing the owner's role via this endpoint
+    const targetMember = await db.query.teamMembers.findFirst({
+      where: and(eq(teamMembers.teamId, id), eq(teamMembers.userId, targetUserId)),
+    });
+    if (!targetMember) {
+      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    }
+    if (targetMember.role === "owner") {
+      return NextResponse.json({ error: "Cannot change the owner's role" }, { status: 400 });
+    }
+
+    // Scrum Master and Team Lead roles require the Company plan
+    if (role === "scrumMaster" || role === "teamLead") {
+      const plan = await getCurrentUserPlan();
+      if (!hasActiveAccess(plan) || plan.plan !== "company") {
+        return NextResponse.json(
+          { error: "Scrum Master and Team Lead roles are available on the Company plan only." },
+          { status: 403 }
+        );
+      }
+    }
+
+    const [updated] = await db
+      .update(teamMembers)
+      .set({ role })
+      .where(and(eq(teamMembers.teamId, id), eq(teamMembers.userId, targetUserId)))
+      .returning();
+
+    return NextResponse.json(updated);
+  } catch (e) {
+    console.error("[PATCH /api/teams/[id]/members]", e);
+    return NextResponse.json({ error: "Failed to update member role" }, { status: 500 });
   }
 }

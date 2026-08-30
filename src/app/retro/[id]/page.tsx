@@ -6,11 +6,13 @@ import Link from "next/link";
 import { useRetroBoard } from "@/components/board/useRetroBoard";
 import { Column } from "@/components/board/Column";
 import { ActionPointsPanel } from "@/components/board/ActionPointsPanel";
+import { ModerationPanel } from "@/components/board/ModerationPanel";
 import { Button } from "@/components/Button";
 import { Logo } from "@/components/Logo";
 import { useAdmin } from "@/components/useAdmin";
 import { cn, timeAgo } from "@/lib/utils";
 import { useSession, signOut } from "@/lib/auth-client";
+import { encryptContent, decryptContent, looksEncrypted } from "@/lib/crypto";
 
 export default function RetroBoardPage() {
   const params = useParams<{ id: string }>();
@@ -22,6 +24,60 @@ export default function RetroBoardPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
+
+  // Zero-knowledge encryption
+  const [encryptionPassword, setEncryptionPassword] = useState<string | null>(null);
+  const [showEncryptionPrompt, setShowEncryptionPrompt] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [decryptedCards, setDecryptedCards] = useState<Record<string, string>>({});
+  const encryptionEnabled = state?.retro?.encryptionEnabled ?? false;
+
+  // Load encryption password from sessionStorage (set during retro creation)
+  useEffect(() => {
+    if (encryptionEnabled && !encryptionPassword) {
+      const stored = sessionStorage.getItem(`retromo_enc_${retroId}`);
+      if (stored) {
+        setEncryptionPassword(stored);
+      } else {
+        setShowEncryptionPrompt(true);
+      }
+    }
+  }, [encryptionEnabled, encryptionPassword, retroId]);
+
+  // Decrypt all card contents whenever cards or password change
+  useEffect(() => {
+    if (!encryptionEnabled || !encryptionPassword || !state?.cards) return;
+    (async () => {
+      const map: Record<string, string> = {};
+      for (const card of state.cards) {
+        if (looksEncrypted(card.content)) {
+          const plain = await decryptContent(card.content, encryptionPassword);
+          map[card.id] = plain ?? "[Unable to decrypt — wrong password]";
+        } else {
+          map[card.id] = card.content;
+        }
+      }
+      setDecryptedCards(map);
+    })();
+  }, [encryptionEnabled, encryptionPassword, state?.cards]);
+
+  async function handleEncryptionSubmit() {
+    setPasswordError(null);
+    // Test the password against the first encrypted card
+    const firstEncrypted = state?.cards?.find((c) => looksEncrypted(c.content));
+    if (firstEncrypted) {
+      const plain = await decryptContent(firstEncrypted.content, passwordInput);
+      if (plain === null) {
+        setPasswordError("Incorrect password. Please try again.");
+        return;
+      }
+    }
+    setEncryptionPassword(passwordInput);
+    sessionStorage.setItem(`retromo_enc_${retroId}`, passwordInput);
+    setShowEncryptionPrompt(false);
+    setPasswordInput("");
+  }
 
   // Timer
   const [now, setNow] = useState(Date.now());
@@ -39,11 +95,20 @@ export default function RetroBoardPage() {
   async function createCard(columnId: string, content: string) {
     const participantId = state?.currentParticipant?.id || null;
     const authorName = state?.currentParticipant?.displayName || null;
-    await fetch("/api/cards", {
+    // Encrypt content client-side if encryption is enabled
+    let payload = content;
+    if (encryptionEnabled && encryptionPassword) {
+      payload = await encryptContent(content, encryptionPassword);
+    }
+    const res = await fetch("/api/cards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ columnId, retroId, content, isPublic: false, participantId, authorName }),
+      body: JSON.stringify({ columnId, retroId, content: payload, isPublic: false, participantId, authorName }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      flash(data.error || "Could not create card");
+    }
     refresh();
   }
 
@@ -94,6 +159,24 @@ export default function RetroBoardPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: cardId, columnId, isPublic, anonymousParticipantId: pid }),
+    });
+    refresh();
+  }
+
+  // Moderation: approve or reject a pending card
+  async function approveCard(cardId: string) {
+    await fetch("/api/cards/moderation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: cardId, action: "approve", retroId }),
+    });
+    refresh();
+  }
+  async function rejectCard(cardId: string) {
+    await fetch("/api/cards/moderation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: cardId, action: "reject", retroId }),
     });
     refresh();
   }
@@ -202,6 +285,7 @@ export default function RetroBoardPage() {
   // Only the host or an admin can access the timer and lock controls.
   const isHost = !!(isLoggedIn && state?.retro?.ownerId && state.retro.ownerId === sessionData?.user?.id);
   const canControl = isHost || isAdmin;
+  const canExport = !!state?.retro?.plan && state.retro.plan !== "anonymous";
 
   // Auto-lock: when the timer was running and has expired, automatically lock the board.
   // We use a ref to avoid calling the lock API multiple times.
@@ -222,6 +306,26 @@ export default function RetroBoardPage() {
     () => [...(state?.columns ?? [])].sort((a, b) => a.position - b.position),
     [state?.columns]
   );
+
+  // Prepare cards for display:
+  // 1. In moderated retros, non-facilitators only see approved cards.
+  //    Facilitators see all cards (pending ones show a "pending" badge).
+  // 2. If encryption is enabled, replace encrypted content with decrypted plaintext.
+  const displayCards = useMemo(() => {
+    if (!state?.cards) return [];
+    const isFac = state.currentParticipant?.isFacilitator || false;
+    let cards = state.cards;
+    if (state.retro.moderated && !isFac) {
+      cards = cards.filter((c) => c.approved);
+    }
+    if (encryptionEnabled && encryptionPassword && Object.keys(decryptedCards).length > 0) {
+      cards = cards.map((c) => ({
+        ...c,
+        content: decryptedCards[c.id] ?? c.content,
+      }));
+    }
+    return cards;
+  }, [state?.cards, state?.retro?.moderated, state?.currentParticipant?.isFacilitator, encryptionEnabled, encryptionPassword, decryptedCards]);
 
   if (loading) {
     return (
@@ -329,10 +433,12 @@ export default function RetroBoardPage() {
             <span className="ml-1 rounded-full bg-indigo-100 px-1.5 text-xs text-indigo-700">{state.actionPoints.length}</span>
           )}
         </Button>
-        <Button size="sm" variant="ghost" onClick={exportMarkdown} title="Export to Markdown">
-          <span className="hidden sm:inline">Export</span>
-          <span className="sm:hidden">⬇</span>
-        </Button>
+        {canExport && (
+          <Button size="sm" variant="ghost" onClick={exportMarkdown} title="Export to Markdown">
+            <span className="hidden sm:inline">Export</span>
+            <span className="sm:hidden">⬇</span>
+          </Button>
+        )}
 
         {/* Logout button for logged-in users */}
         {isLoggedIn && (
@@ -445,7 +551,7 @@ export default function RetroBoardPage() {
             <Column
               key={col.id}
               column={col}
-              cards={state.cards.filter((c) => c.columnId === col.id)}
+              cards={displayCards.filter((c) => c.columnId === col.id)}
               currentUserId={state.currentUserId}
               currentParticipantId={state.currentParticipant?.id || null}
               currentParticipantName={state.currentParticipant?.displayName || null}
@@ -465,6 +571,40 @@ export default function RetroBoardPage() {
           ))}
         </div>
       </div>
+
+      {/* Encryption password prompt */}
+      {showEncryptionPrompt && encryptionEnabled && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-neutral-900">🔐 Enter decryption password</h2>
+            <p className="mt-2 text-sm text-neutral-500">This retrospective is encrypted. Enter the password to view and add cards.</p>
+            <input
+              type="password"
+              autoFocus
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleEncryptionSubmit()}
+              placeholder="Password"
+              className="mt-4 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+            />
+            {passwordError && <p className="mt-2 text-sm text-red-600">{passwordError}</p>}
+            <div className="mt-4 flex justify-end gap-2">
+              <Button size="sm" variant="ghost" onClick={() => { setShowEncryptionPrompt(false); setPasswordInput(""); }}>Cancel</Button>
+              <Button size="sm" onClick={handleEncryptionSubmit}>Unlock</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Moderation panel for facilitators */}
+      {retroData.moderated && (state.currentParticipant?.isFacilitator || canControl) && (
+        <ModerationPanel
+          cards={state.cards.filter((c) => !c.approved)}
+          onApprove={approveCard}
+          onReject={rejectCard}
+        />
+      )}
 
       {/* Action points slide-over */}
       {showAP && (

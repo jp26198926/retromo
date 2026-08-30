@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
     let retroPlan: "anonymous" | "individual" | "company" = "anonymous";
     let privateRetrosAllowed = false;
     let advancedFacilitation = false;
+    let configurableRetention = false;
+    let zeroKnowledgeEncryption = false;
 
     if (session?.user) {
       const plan = await getCurrentUserPlan();
@@ -45,6 +47,8 @@ export async function POST(req: NextRequest) {
         retroPlan = plan.plan;
         privateRetrosAllowed = plan.privateRetros;
         advancedFacilitation = plan.advancedFacilitation;
+        configurableRetention = plan.configurableRetention;
+        zeroKnowledgeEncryption = plan.zeroKnowledgeEncryption;
       }
     }
 
@@ -63,6 +67,37 @@ export async function POST(req: NextRequest) {
     if (moderated && !advancedFacilitation) {
       return NextResponse.json(
         { error: "Moderation is an advanced facilitation feature available on paid plans." },
+        { status: 403 }
+      );
+    }
+
+    // Configurable data retention — paid plans (Individual/Company) can set a custom
+    // retention period. Anonymous plan is always 365 days. null = keep forever.
+    let resolvedRetentionDays: number | null;
+    if (retroPlan === "anonymous") {
+      resolvedRetentionDays = 365;
+    } else if (configurableRetention && body.retentionDays !== undefined && body.retentionDays !== null) {
+      const rd = Number(body.retentionDays);
+      // Allow 1-3650 days, or 0 / -1 for "forever"
+      if (Number.isInteger(rd) && (rd === 0 || rd === -1 || (rd >= 1 && rd <= 3650))) {
+        resolvedRetentionDays = rd === 0 || rd === -1 ? null : rd;
+      } else {
+        return NextResponse.json(
+          { error: "Retention days must be a whole number between 1 and 3650, or 0 for forever." },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Paid plan but no custom value provided — keep forever
+      resolvedRetentionDays = null;
+    }
+
+    // Zero-knowledge encryption — Company plan only. The password is never sent to
+    // the server; only a boolean flag is stored so the board knows to prompt for it.
+    const encryptionEnabled = body.encryptionEnabled === true;
+    if (encryptionEnabled && !zeroKnowledgeEncryption) {
+      return NextResponse.json(
+        { error: "Zero-knowledge encryption is available on the Company plan only." },
         { status: 403 }
       );
     }
@@ -88,7 +123,8 @@ export async function POST(req: NextRequest) {
         ownerId: session?.user.id || null,
         plan: retroPlan,
         shareToken: generateShareToken(),
-        retentionDays: retroPlan === "anonymous" ? 365 : null,
+        retentionDays: resolvedRetentionDays,
+        encryptionEnabled,
         timerEndsAt: timerDuration > 0 ? new Date(now.getTime() + timerDuration * 1000) : null,
       })
       .returning();

@@ -127,6 +127,9 @@ export const retros = pgTable("retro", {
   ownerId: text("owner_id").references(() => user.id, { onDelete: "set null" }),
   // data retention (days), null = forever
   retentionDays: integer("retention_days"),
+  // zero-knowledge encryption: when true, card content is encrypted client-side
+  // with a password-derived AES-256-GCM key. The server never sees the plaintext.
+  encryptionEnabled: boolean("encryption_enabled").notNull().default(false),
   // share token for anonymous access
   shareToken: text("share_token").notNull().unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -175,6 +178,9 @@ export const cards = pgTable("card", {
   color: cardColorEnum("color").notNull().default("yellow"),
   // public = in the shared board area; private = in author's private section
   isPublic: boolean("is_public").notNull().default(false),
+  // moderation: when a retro is moderated, new cards start as pending (approved=false)
+  // and only appear publicly after a facilitator approves them
+  approved: boolean("approved").notNull().default(true),
   position: integer("position").notNull().default(0),
   votesCount: integer("votes_count").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),

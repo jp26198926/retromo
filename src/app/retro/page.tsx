@@ -130,6 +130,20 @@ export default function RetroHistoryPage() {
     setPage(1);
   };
 
+  const toggleArchive = async (id: string, currentArchived: boolean) => {
+    const res = await fetch(`/api/retros/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived: !currentArchived }),
+    });
+    if (res.ok) {
+      fetchData();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      alert(d.error || "Failed to update archive status");
+    }
+  };
+
   const hasFilters = useMemo(
     () => search || planFilter || teamFilter || roleFilter,
     [search, planFilter, teamFilter, roleFilter]
@@ -371,9 +385,21 @@ export default function RetroHistoryPage() {
                           {new Date(item.updatedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <Link href={`/retro/${item.id}`}>
-                            <Button size="sm" variant="outline">Open</Button>
-                          </Link>
+                          <div className="flex items-center justify-end gap-1">
+                            <Link href={`/retro/${item.id}`}>
+                              <Button size="sm" variant="outline">Open</Button>
+                            </Link>
+                            {item.isOwner && item.plan !== "anonymous" && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => toggleArchive(item.id, item.archived)}
+                                title={item.archived ? "Unarchive" : "Archive"}
+                              >
+                                {item.archived ? "↪" : "📦"}
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))

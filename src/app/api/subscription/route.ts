@@ -36,19 +36,30 @@ export async function GET() {
       ? new Date(u.subscriptionCurrentPeriodEnd)
       : null;
     // If cancelled and period has expired, the effective plan is anonymous
-    const effectivePlan =
+    const effectivePlanKey =
       isCancelled && periodEnd && periodEnd < new Date()
         ? "anonymous"
         : u.subscriptionPlan;
+    // The effective features reflect the effective plan
+    const effectiveFeatures = getPlanFeatures(effectivePlanKey);
 
     return NextResponse.json({
       subscriptionPlan: u.subscriptionPlan,
-      effectivePlan,
+      effectivePlan: effectivePlanKey,
       subscriptionStatus: u.subscriptionStatus,
       paypalSubscriptionId: u.paypalSubscriptionId,
       subscriptionCurrentPeriodEnd: u.subscriptionCurrentPeriodEnd,
       subscriptionCancelledAt: u.subscriptionCancelledAt,
       hasActiveAccess: activeAccess,
+      // Full plan feature set for the effective plan (used by the setup wizard
+      // and other UI to know which features to show)
+      plan: {
+        ...effectiveFeatures,
+        plan: effectivePlanKey,
+        status: u.subscriptionStatus,
+        isActive: activeAccess,
+        currentPeriodEnd: u.subscriptionCurrentPeriodEnd,
+      },
       billingHistory: history.map((h) => ({
         id: h.id,
         plan: h.plan,

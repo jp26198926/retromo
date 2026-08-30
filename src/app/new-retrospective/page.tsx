@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
@@ -36,6 +36,51 @@ function NewRetroForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Privacy & compliance options (plan-gated)
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [moderated, setModerated] = useState(false);
+  const [retentionDays, setRetentionDays] = useState<number>(0); // 0 = forever
+  const [encryptionEnabled, setEncryptionEnabled] = useState(false);
+  const [encryptionPassword, setEncryptionPassword] = useState("");
+  const [encryptionConfirm, setEncryptionConfirm] = useState("");
+
+  // Fetch the user's plan to know which features are available
+  const [planFeatures, setPlanFeatures] = useState<{
+    plan: string;
+    privateRetros: boolean;
+    advancedFacilitation: boolean;
+    configurableRetention: boolean;
+    zeroKnowledgeEncryption: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/subscription");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.plan) {
+            setPlanFeatures({
+              plan: data.plan.plan,
+              privateRetros: data.plan.privateRetros,
+              advancedFacilitation: data.plan.advancedFacilitation,
+              configurableRetention: data.plan.configurableRetention,
+              zeroKnowledgeEncryption: data.plan.zeroKnowledgeEncryption,
+            });
+          }
+        }
+      } catch {
+        /* not logged in or no plan — defaults to anonymous */
+      }
+    })();
+  }, []);
+
+  const isPaid = planFeatures && planFeatures.plan !== "anonymous";
+  const canPrivate = planFeatures?.privateRetros ?? false;
+  const canModerate = planFeatures?.advancedFacilitation ?? false;
+  const canRetention = planFeatures?.configurableRetention ?? false;
+  const canEncrypt = planFeatures?.zeroKnowledgeEncryption ?? false;
+
   function selectTemplate(id: string) {
     setTemplateId(id);
     const t = BUILTIN_TEMPLATES.find((x) => x.id === id);
@@ -65,6 +110,15 @@ function NewRetroForm() {
     setLoading(true);
     setError(null);
     try {
+      // Validate encryption password if encryption is enabled
+      if (encryptionEnabled) {
+        if (encryptionPassword.length < 6) {
+          throw new Error("Encryption password must be at least 6 characters.");
+        }
+        if (encryptionPassword !== encryptionConfirm) {
+          throw new Error("Encryption passwords do not match.");
+        }
+      }
       const res = await fetch("/api/retros", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -72,6 +126,10 @@ function NewRetroForm() {
           title,
           topic: topic || undefined,
           engagement,
+          visibility: isPrivate ? "private" : "regular",
+          moderated,
+          retentionDays: canRetention ? retentionDays : undefined,
+          encryptionEnabled: canEncrypt ? encryptionEnabled : false,
           columns,
           votesPerParticipant,
           secretVoting,
@@ -81,6 +139,11 @@ function NewRetroForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create retro");
+      // Store the encryption password in sessionStorage so the board can use it
+      // immediately for encryption/decryption without re-prompting.
+      if (encryptionEnabled && encryptionPassword) {
+        sessionStorage.setItem(`retromo_enc_${data.id}`, encryptionPassword);
+      }
       router.push(`/retro/${data.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create retro");
@@ -206,6 +269,127 @@ function NewRetroForm() {
                 </button>
               </div>
             </div>
+          </section>
+
+          {/* Privacy & Compliance */}
+          <section className="mb-10 rounded-2xl border border-neutral-200 bg-white p-6">
+            <h2 className="mb-1 text-lg font-semibold text-neutral-900">Privacy &amp; Compliance</h2>
+            <p className="mb-4 text-sm text-neutral-500">Optional controls — some require a paid plan.</p>
+
+            {/* Private retro */}
+            <div className="flex items-center justify-between rounded-lg border border-neutral-200 p-3">
+              <div>
+                <div className="text-sm font-medium text-neutral-800">Private retrospective</div>
+                <div className="text-xs text-neutral-500">Only people with the link can join. {!canPrivate && <span className="text-amber-600">Requires Personal or Company plan.</span>}</div>
+              </div>
+              <button
+                onClick={() => canPrivate && setIsPrivate((v) => !v)}
+                disabled={!canPrivate}
+                className={cn("flex h-10 items-center justify-between rounded-lg border-2 px-3 text-sm", isPrivate ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-neutral-200 text-neutral-600", !canPrivate && "cursor-not-allowed opacity-50")}
+              >
+                {isPrivate ? "On" : "Off"}
+                <span className={cn("relative ml-2 h-5 w-9 rounded-full transition-colors", isPrivate ? "bg-indigo-600" : "bg-neutral-300")}>
+                  <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all", isPrivate ? "left-4" : "left-0.5")} />
+                </span>
+              </button>
+            </div>
+
+            {/* Moderation */}
+            <div className="mt-3 flex items-center justify-between rounded-lg border border-neutral-200 p-3">
+              <div>
+                <div className="text-sm font-medium text-neutral-800">Moderation</div>
+                <div className="text-xs text-neutral-500">Cards require facilitator approval before appearing publicly. {!canModerate && <span className="text-amber-600">Requires Personal or Company plan.</span>}</div>
+              </div>
+              <button
+                onClick={() => canModerate && setModerated((v) => !v)}
+                disabled={!canModerate}
+                className={cn("flex h-10 items-center justify-between rounded-lg border-2 px-3 text-sm", moderated ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-neutral-200 text-neutral-600", !canModerate && "cursor-not-allowed opacity-50")}
+              >
+                {moderated ? "On" : "Off"}
+                <span className={cn("relative ml-2 h-5 w-9 rounded-full transition-colors", moderated ? "bg-indigo-600" : "bg-neutral-300")}>
+                  <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all", moderated ? "left-4" : "left-0.5")} />
+                </span>
+              </button>
+            </div>
+
+            {/* Data retention */}
+            <div className="mt-3 rounded-lg border border-neutral-200 p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium text-neutral-800">Data retention</div>
+                  <div className="text-xs text-neutral-500">Auto-delete this retro after N days. {!canRetention && <span className="text-amber-600">Requires Personal or Company plan.</span>}</div>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-3">
+                <select
+                  disabled={!canRetention}
+                  value={retentionDays === 0 ? "forever" : String(retentionDays)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setRetentionDays(v === "forever" ? 0 : Number(v));
+                  }}
+                  className={cn("rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-indigo-500", !canRetention && "cursor-not-allowed opacity-50")}
+                >
+                  <option value="forever">Keep forever</option>
+                  <option value="30">30 days</option>
+                  <option value="90">90 days</option>
+                  <option value="180">180 days</option>
+                  <option value="365">365 days</option>
+                </select>
+                {!canRetention && <span className="text-xs text-amber-600">Upgrade to configure</span>}
+              </div>
+            </div>
+
+            {/* Zero-knowledge encryption */}
+            <div className="mt-3 rounded-lg border border-neutral-200 p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium text-neutral-800">Zero-knowledge encryption</div>
+                  <div className="text-xs text-neutral-500">Encrypt card content with a password. The password is never sent to the server. {!canEncrypt && <span className="text-amber-600">Requires Company plan.</span>}</div>
+                </div>
+                <button
+                  onClick={() => canEncrypt && setEncryptionEnabled((v) => !v)}
+                  disabled={!canEncrypt}
+                  className={cn("flex h-10 items-center justify-between rounded-lg border-2 px-3 text-sm", encryptionEnabled ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-neutral-200 text-neutral-600", !canEncrypt && "cursor-not-allowed opacity-50")}
+                >
+                  {encryptionEnabled ? "On" : "Off"}
+                  <span className={cn("relative ml-2 h-5 w-9 rounded-full transition-colors", encryptionEnabled ? "bg-indigo-600" : "bg-neutral-300")}>
+                    <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all", encryptionEnabled ? "left-4" : "left-0.5")} />
+                  </span>
+                </button>
+              </div>
+              {encryptionEnabled && (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">Encryption password</label>
+                    <input
+                      type="password"
+                      value={encryptionPassword}
+                      onChange={(e) => setEncryptionPassword(e.target.value)}
+                      placeholder="At least 6 characters"
+                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">Confirm password</label>
+                    <input
+                      type="password"
+                      value={encryptionConfirm}
+                      onChange={(e) => setEncryptionConfirm(e.target.value)}
+                      placeholder="Re-enter password"
+                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                    />
+                  </div>
+                  <p className="col-span-full text-xs text-amber-600">⚠ Keep this password safe — it cannot be recovered. If lost, encrypted cards become unreadable.</p>
+                </div>
+              )}
+            </div>
+
+            {!isPaid && (
+              <div className="mt-4 rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-500">
+                You're on the free plan. <Link href="/plans" className="font-medium text-indigo-600 hover:underline">Upgrade</Link> to unlock private retros, moderation, data retention, and encryption.
+              </div>
+            )}
           </section>
 
           {/* Columns */}
